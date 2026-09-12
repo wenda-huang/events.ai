@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { EventCard } from "@/components/EventCard";
@@ -37,9 +37,13 @@ function MapView() {
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [recommendedExpanded, setRecommendedExpanded] = useState(false);
+  const mapAreaRef = useRef<HTMLDivElement>(null);
   const recommendedListRef = useRef<HTMLDivElement>(null);
+  const recHeaderRef = useRef<HTMLDivElement>(null);
+  const firstCardRef = useRef<HTMLDivElement>(null);
   const searchOverlayRef = useRef<HTMLDivElement>(null);
   const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
+  const [panelHeight, setPanelHeight] = useState<number>();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
   const [error, setError] = useState("");
@@ -47,7 +51,6 @@ function MapView() {
     if (filterTags.length === 0) return recommended;
     return recommended.filter((event) => (event.tags || []).some((tag) => filterTags.includes(tag)));
   }, [recommended, filterTags]);
-  const visibleRecommended = recommendedExpanded ? filteredRecommended : filteredRecommended.slice(0, 1);
 
   useEffect(() => {
     client.tags().then((res) => setAllTags(res.tags));
@@ -97,8 +100,20 @@ function MapView() {
     return () => observer.disconnect();
   }, [showFilters]);
 
+  useLayoutEffect(() => {
+    const mapHeight = mapAreaRef.current?.clientHeight ?? 0;
+    const headerHeight = recHeaderRef.current?.getBoundingClientRect().height ?? 0;
+    const cardHeight = firstCardRef.current?.getBoundingClientRect().height ?? 0;
+    const outerPad = 32;
+    const innerPad = 24;
+    const headerGap = 8;
+    const collapsedHeight = Math.ceil(outerPad + innerPad + headerHeight + headerGap + cardHeight);
+    const expandedHeight = Math.max(collapsedHeight, mapHeight - searchOverlayHeight);
+    setPanelHeight(recommendedExpanded ? expandedHeight : collapsedHeight);
+  }, [recommendedExpanded, searchOverlayHeight, filteredRecommended]);
+
   return (
-    <div className="relative min-h-0 flex-1">
+    <div ref={mapAreaRef} className="relative min-h-0 flex-1">
       <EventMap origin={origin} events={events} onMapInteract={() => setRecommendedExpanded(false)} />
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
@@ -177,17 +192,11 @@ function MapView() {
               setRecommendedExpanded(false);
             }
           }}
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col p-4 transition-[top,height] duration-300 ease-out ${
-            recommendedExpanded ? "" : "h-auto"
-          }`}
-          style={recommendedExpanded ? { top: searchOverlayHeight } : undefined}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col overflow-hidden p-4 transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={panelHeight ? { height: panelHeight } : undefined}
         >
-          <div
-            className={`pointer-events-auto mx-auto flex min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur ${
-              recommendedExpanded ? "h-full" : ""
-            }`}
-          >
-            <div className="mb-2 flex shrink-0 items-center justify-between">
+          <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
+            <div ref={recHeaderRef} className="mb-2 flex shrink-0 items-center justify-between">
               <p className="text-[11px] uppercase tracking-[0.2em] text-gold">
                 Recommended
                 <span className="ml-2 tracking-normal text-mute">
@@ -206,13 +215,17 @@ function MapView() {
             </div>
             <div
               ref={recommendedListRef}
-              className={`min-h-0 space-y-2 ${recommendedExpanded ? "flex-1 overflow-auto" : "overflow-hidden"}`}
+              className={`min-h-0 flex-1 space-y-2 ${recommendedExpanded ? "overflow-auto" : "overflow-hidden"}`}
             >
-              {visibleRecommended.map((event) => (
-                <EventCard key={event.id} event={event} />
+              {filteredRecommended.map((event, index) => (
+                <div key={event.id} ref={index === 0 ? firstCardRef : undefined}>
+                  <EventCard event={event} />
+                </div>
               ))}
               {filteredRecommended.length === 0 && (
-                <p className="px-1 py-6 text-center text-sm text-mute">No recommendations match these filters.</p>
+                <p ref={firstCardRef} className="px-1 py-6 text-center text-sm text-mute">
+                  No recommendations match these filters.
+                </p>
               )}
             </div>
           </div>
