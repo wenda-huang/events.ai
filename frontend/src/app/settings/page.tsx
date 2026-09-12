@@ -62,7 +62,15 @@ function Settings() {
       <section className="mt-8 rounded-2xl border border-line bg-card p-5">
         <h2 className="text-sm text-cream">Default search radius</h2>
         <div className="mt-4 flex items-center gap-3">
-          <input type="range" min={1} max={15} step={0.5} value={radius} onChange={(e) => setRadius(Number(e.target.value))} />
+          <input
+            type="range"
+            min={1}
+            max={15}
+            step={0.5}
+            value={radius}
+            onChange={(e) => setRadius(Number(e.target.value))}
+            style={{ ["--range-progress" as string]: `${((radius - 1) / 14) * 100}%` }}
+          />
           <span className="text-sm text-gold">{radius} mi</span>
           <button className="btn-ghost" onClick={saveRadius}>
             Save
