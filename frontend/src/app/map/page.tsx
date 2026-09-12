@@ -1,15 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { EventCard } from "@/components/EventCard";
+import { EventCover } from "@/components/EventCover";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
-import { defaultWindow, PITTSBURGH, queryParams, resolveOrigin } from "@/lib/geo";
+import { defaultWindow, formatWhen, PITTSBURGH, queryParams, resolveOrigin } from "@/lib/geo";
 import type { EventItem, Origin } from "@/lib/types";
+
+const SEARCH_DEBOUNCE_MS = 2000;
 
 const EventMap = dynamic(() => import("@/components/EventMap"), { ssr: false });
 
@@ -30,6 +34,33 @@ function matchesFilterTags(event: EventItem, tags: string[]) {
   return (event.tags || []).some((tag) => tags.includes(tag));
 }
 
+function SearchMatchRow({ event }: { event: EventItem }) {
+  return (
+    <Link
+      href={`/events/${event.id}`}
+      className="flex gap-3 rounded-xl border border-line bg-card/80 p-2 hover:border-gold/50"
+    >
+      <EventCover tags={event.tags} title={`${event.tags?.[0] || "Event"} cover`} className="h-16 w-24 shrink-0 rounded-lg" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="font-display text-sm leading-tight text-cream">{event.title}</p>
+          {event.distance_mi != null && <span className="shrink-0 text-xs text-mute">{event.distance_mi} mi</span>}
+        </div>
+        <p className="mt-0.5 text-[11px] text-mute">{formatWhen(event.starts_at)}</p>
+        {event.tags?.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {event.tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="rounded-full bg-ink px-2 py-0.5 text-[10px] uppercase tracking-wide text-gold">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
   const [origin, setOrigin] = useState<Origin>(PITTSBURGH);
@@ -39,6 +70,9 @@ function MapView() {
   const [start, setStart] = useState(windowDefaults.start);
   const [end, setEnd] = useState(windowDefaults.end);
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [fetchedQ, setFetchedQ] = useState("");
+  const [eventsLoading, setEventsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -61,6 +95,8 @@ function MapView() {
     () => recommended.filter((event) => matchesFilterTags(event, filterTags)),
     [recommended, filterTags]
   );
+  const showSearchAnim = q !== debouncedQ || (eventsLoading && (q.trim() !== "" || debouncedQ.trim() !== ""));
+  const showMatches = fetchedQ.trim().length > 0;
 
   useEffect(() => {
     client.tags().then((res) => setAllTags(res.tags));
@@ -85,14 +121,41 @@ function MapView() {
   }, []);
 
   useEffect(() => {
-    const params = queryParams(origin, radius, start, end, q);
+    if (q === debouncedQ) return;
+    const timer = setTimeout(() => setDebouncedQ(q), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [q, debouncedQ]);
+
+  useEffect(() => {
+    const params = queryParams(origin, radius, start, end, debouncedQ);
     let cancelled = false;
     setError("");
-    Promise.all([client.events(params), client.recommended(queryParams(origin, radius, start, end))])
-      .then(([list, rec]) => {
+    setEventsLoading(true);
+    client
+      .events(params)
+      .then((list) => {
         if (cancelled) return;
         setEvents(list.events);
-        setRecommended(rec.events);
+        setFetchedQ(debouncedQ);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load events");
+      })
+      .finally(() => {
+        if (!cancelled) setEventsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [origin, radius, start, end, debouncedQ]);
+
+  useEffect(() => {
+    const params = queryParams(origin, radius, start, end);
+    let cancelled = false;
+    client
+      .recommended(params)
+      .then((rec) => {
+        if (!cancelled) setRecommended(rec.events);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load events");
@@ -100,7 +163,7 @@ function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [origin, radius, start, end, q]);
+  }, [origin, radius, start, end]);
 
   useEffect(() => {
     const el = searchOverlayRef.current;
@@ -135,12 +198,22 @@ function MapView() {
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              className="field min-w-56 flex-1"
-              placeholder="Search events, tags, neighborhoods…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
+            <div className="relative min-w-56 flex-1">
+              <input
+                className={`field ${showSearchAnim ? "pr-12" : ""}`}
+                placeholder="Search events, tags, neighborhoods…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-busy={showSearchAnim}
+              />
+              {showSearchAnim && (
+                <span className="search-dots pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-xs text-mute">
               Radius
               <input
@@ -200,9 +273,28 @@ function MapView() {
               </div>
             </div>
           </div>
-          {(error || outsideCity) && (
+          {showMatches && (
+            <div className="mt-2 max-h-64 space-y-1.5 overflow-auto border-t border-line pt-2">
+              {filteredEvents.map((event) => (
+                <SearchMatchRow key={event.id} event={event} />
+              ))}
+              {filteredEvents.length === 0 && !showSearchAnim && (
+                <p className="px-1 py-3 text-center text-sm text-mute">No matching events in this area.</p>
+              )}
+            </div>
+          )}
+          {(error || outsideCity || showSearchAnim || showMatches) && (
             <div className="mt-2 flex items-center justify-between text-xs text-mute">
-              {outsideCity ? <span>Showing Pittsburgh (you’re outside the launch city)</span> : <span />}
+              <span>
+                {showSearchAnim
+                  ? "Searching…"
+                  : showMatches
+                    ? `${filteredEvents.length} match${filteredEvents.length === 1 ? "" : "es"}`
+                    : outsideCity
+                      ? "Showing Pittsburgh (you’re outside the launch city)"
+                      : ""}
+                {!showSearchAnim && showMatches && outsideCity ? " · showing Pittsburgh" : ""}
+              </span>
               {error && <span className="text-rust">{error}</span>}
             </div>
           )}

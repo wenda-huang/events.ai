@@ -9,6 +9,7 @@ from app.geo import within_radius
 from app.models import Event, EventMembership, User
 from app.schemas import EventCreate
 from app.serialize import dump_tags, event_public, parse_tags
+from app.services.search import MIN_SCORE, expand_query, score_event
 from app.tags import normalize_tags
 
 router = APIRouter(tags=["events"])
@@ -33,22 +34,6 @@ def recommend_sort_key(event: dict) -> tuple:
     return (-int(event.get("tag_overlap") or 0), event.get("distance_mi") or 99, event.get("starts_at") or "")
 
 
-def _matches_query(event: Event, q: str) -> bool:
-    needle = q.strip().lower()
-    if not needle:
-        return True
-    hay = " ".join(
-        [
-            event.title,
-            event.description,
-            event.address,
-            event.city,
-            " ".join(parse_tags(event.tags)),
-        ]
-    ).lower()
-    return needle in hay
-
-
 def _load_events(db: Session) -> list[Event]:
     return db.query(Event).options(selectinload(Event.memberships)).all()
 
@@ -69,16 +54,26 @@ def list_events(
         window_start = _naive(start)
     if end is not None:
         window_end = _naive(end)
+    query = expand_query(q or "")
     results = []
     for event in _load_events(db):
         if event.starts_at > window_end or event.ends_at < window_start:
             continue
         if not within_radius(lat, lng, event.lat, event.lng, radius_mi):
             continue
-        if q and not _matches_query(event, q):
-            continue
-        results.append(event_public(event, origin=(lat, lng), current_user_id=user.id))
-    results.sort(key=lambda e: (e["starts_at"], e["distance_mi"] or 0))
+        if query is not None:
+            relevance = score_event(event, query)
+            if relevance < MIN_SCORE:
+                continue
+            payload = event_public(event, origin=(lat, lng), current_user_id=user.id)
+            payload["relevance"] = round(relevance, 2)
+            results.append(payload)
+        else:
+            results.append(event_public(event, origin=(lat, lng), current_user_id=user.id))
+    if query is not None:
+        results.sort(key=lambda e: (-(e.get("relevance") or 0), e.get("distance_mi") or 99, e["starts_at"]))
+    else:
+        results.sort(key=lambda e: (e["starts_at"], e["distance_mi"] or 0))
     return {"events": results}
 
 
