@@ -38,6 +38,18 @@ def _load_events(db: Session) -> list[Event]:
     return db.query(Event).options(selectinload(Event.memberships)).all()
 
 
+def search_and_distance_origins(
+    lat: float,
+    lng: float,
+    origin_lat: float | None = None,
+    origin_lng: float | None = None,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    search = (lat, lng)
+    if origin_lat is not None and origin_lng is not None:
+        return search, (origin_lat, origin_lng)
+    return search, search
+
+
 @router.get("/events")
 def list_events(
     lat: float = Query(...),
@@ -46,6 +58,8 @@ def list_events(
     start: datetime | None = None,
     end: datetime | None = None,
     q: str | None = None,
+    origin_lat: float | None = None,
+    origin_lng: float | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -54,22 +68,23 @@ def list_events(
         window_start = _naive(start)
     if end is not None:
         window_end = _naive(end)
+    search_at, distance_from = search_and_distance_origins(lat, lng, origin_lat, origin_lng)
     query = expand_query(q or "")
     results = []
     for event in _load_events(db):
         if event.starts_at > window_end or event.ends_at < window_start:
             continue
-        if not within_radius(lat, lng, event.lat, event.lng, radius_mi):
+        if not within_radius(search_at[0], search_at[1], event.lat, event.lng, radius_mi):
             continue
         if query is not None:
             relevance = score_event(event, query)
             if relevance < MIN_SCORE:
                 continue
-            payload = event_public(event, origin=(lat, lng), current_user_id=user.id)
+            payload = event_public(event, origin=distance_from, current_user_id=user.id)
             payload["relevance"] = round(relevance, 2)
             results.append(payload)
         else:
-            results.append(event_public(event, origin=(lat, lng), current_user_id=user.id))
+            results.append(event_public(event, origin=distance_from, current_user_id=user.id))
     if query is not None:
         results.sort(key=lambda e: (-(e.get("relevance") or 0), e.get("distance_mi") or 99, e["starts_at"]))
     else:
@@ -84,6 +99,8 @@ def recommended_events(
     radius_mi: float = Query(3, ge=0.25, le=50),
     start: datetime | None = None,
     end: datetime | None = None,
+    origin_lat: float | None = None,
+    origin_lng: float | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -92,15 +109,16 @@ def recommended_events(
         window_start = _naive(start)
     if end is not None:
         window_end = _naive(end)
+    search_at, distance_from = search_and_distance_origins(lat, lng, origin_lat, origin_lng)
     user_tags = set(parse_tags(user.tags))
     scored = []
     for event in _load_events(db):
         if event.starts_at > window_end or event.ends_at < window_start:
             continue
-        if not within_radius(lat, lng, event.lat, event.lng, radius_mi):
+        if not within_radius(search_at[0], search_at[1], event.lat, event.lng, radius_mi):
             continue
         event_tags = set(parse_tags(event.tags))
-        payload = event_public(event, origin=(lat, lng), current_user_id=user.id)
+        payload = event_public(event, origin=distance_from, current_user_id=user.id)
         payload["tag_overlap"] = interest_overlap(user_tags, event_tags)
         scored.append(payload)
     scored.sort(key=recommend_sort_key)

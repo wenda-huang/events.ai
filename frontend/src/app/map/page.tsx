@@ -10,7 +10,7 @@ import { EventCover } from "@/components/EventCover";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
-import { defaultWindow, formatWhen, PITTSBURGH, queryParams, resolveOrigin } from "@/lib/geo";
+import { defaultWindow, formatWhen, PITTSBURGH, queryParams, resolveOrigin, roundCoord, sameOrigin } from "@/lib/geo";
 import type { EventItem, Origin } from "@/lib/types";
 
 const SEARCH_DEBOUNCE_MS = 2000;
@@ -64,6 +64,9 @@ function SearchMatchRow({ event }: { event: EventItem }) {
 function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
   const [origin, setOrigin] = useState<Origin>(PITTSBURGH);
+  const [mapFocus, setMapFocus] = useState<Origin>(PITTSBURGH);
+  const [focusNonce, setFocusNonce] = useState(0);
+  const [searchCenter, setSearchCenter] = useState<Origin>(PITTSBURGH);
   const [outsideCity, setOutsideCity] = useState(false);
   const [userLocation, setUserLocation] = useState<Origin | null>(null);
   const [radius, setRadius] = useState(3);
@@ -111,6 +114,9 @@ function MapView() {
         setOrigin(resolved.origin);
         setOutsideCity(resolved.outsideCity);
         setUserLocation(coords);
+        setMapFocus(resolved.origin);
+        setSearchCenter(resolved.origin);
+        setFocusNonce((n) => n + 1);
       },
       () => {
         setOrigin(PITTSBURGH);
@@ -126,8 +132,10 @@ function MapView() {
     return () => clearTimeout(timer);
   }, [q, debouncedQ]);
 
+  const distanceFrom = userLocation ?? origin;
+
   useEffect(() => {
-    const params = queryParams(origin, radius, start, end, debouncedQ);
+    const params = queryParams(searchCenter, radius, start, end, debouncedQ, distanceFrom);
     let cancelled = false;
     setError("");
     setEventsLoading(true);
@@ -147,10 +155,10 @@ function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [origin, radius, start, end, debouncedQ]);
+  }, [searchCenter, radius, start, end, debouncedQ, distanceFrom.lat, distanceFrom.lng]);
 
   useEffect(() => {
-    const params = queryParams(origin, radius, start, end);
+    const params = queryParams(searchCenter, radius, start, end, "", distanceFrom);
     let cancelled = false;
     client
       .recommended(params)
@@ -163,7 +171,7 @@ function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [origin, radius, start, end]);
+  }, [searchCenter, radius, start, end, distanceFrom.lat, distanceFrom.lng]);
 
   useEffect(() => {
     const el = searchOverlayRef.current;
@@ -190,10 +198,21 @@ function MapView() {
   return (
     <div ref={mapAreaRef} className="relative min-h-0 flex-1">
       <EventMap
-        origin={origin}
+        origin={mapFocus}
         events={filteredEvents}
         userLocation={userLocation}
+        focusNonce={focusNonce}
         onMapInteract={() => setRecommendedExpanded(false)}
+        onViewIdle={(center) => {
+          const next = { lat: roundCoord(center.lat), lng: roundCoord(center.lng) };
+          setSearchCenter((prev) => (sameOrigin(prev, next) ? prev : next));
+        }}
+        onUserLocationClick={() => {
+          if (!userLocation) return;
+          setMapFocus(userLocation);
+          setFocusNonce((n) => n + 1);
+          setRecommendedExpanded(false);
+        }}
       />
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">

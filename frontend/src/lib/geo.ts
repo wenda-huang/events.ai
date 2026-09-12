@@ -39,14 +39,32 @@ export function defaultWindow(): { start: string; end: string } {
   return { start: toLocalInput(start), end: toLocalInput(end) };
 }
 
-export function queryParams(origin: Origin, radius: number, start: string, end: string, q = ""): URLSearchParams {
+export function roundCoord(value: number): number {
+  return Math.round(value * 1e5) / 1e5;
+}
+
+export function sameOrigin(a: Origin, b: Origin): boolean {
+  return roundCoord(a.lat) === roundCoord(b.lat) && roundCoord(a.lng) === roundCoord(b.lng);
+}
+
+export function queryParams(
+  center: Origin,
+  radius: number,
+  start: string,
+  end: string,
+  q = "",
+  distanceFrom?: Origin | null
+): URLSearchParams {
   const params = new URLSearchParams({
-    lat: String(origin.lat),
-    lng: String(origin.lng),
+    lat: String(center.lat),
+    lng: String(center.lng),
     radius_mi: String(radius),
     start: new Date(start).toISOString(),
     end: new Date(end).toISOString(),
   });
+  const from = distanceFrom ?? center;
+  params.set("origin_lat", String(from.lat));
+  params.set("origin_lng", String(from.lng));
   if (q.trim()) params.set("q", q.trim());
   return params;
 }
