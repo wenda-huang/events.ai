@@ -35,6 +35,8 @@ def ini_values() -> dict[str, str]:
         values["llm_api_key"] = parser.get("openrouter", "api_key", fallback="").strip()
         values["llm_base_url"] = parser.get("openrouter", "base_url", fallback="").strip()
         values["llm_model"] = parser.get("openrouter", "model", fallback="").strip()
+        values["llm_provider"] = parser.get("openrouter", "provider", fallback="").strip()
+        values["llm_reasoning"] = parser.get("openrouter", "reasoning", fallback="").strip()
     elif parser.has_section("openai"):
         values["llm_api_key"] = parser.get("openai", "api_key", fallback="").strip()
         values["llm_base_url"] = parser.get("openai", "base_url", fallback="").strip()
@@ -81,6 +83,24 @@ class Settings(BaseSettings):
 
     def llm_model(self) -> str:
         return ini_values().get("llm_model") or "openai/gpt-4o-mini"
+
+    def llm_providers(self) -> list[str]:
+        raw = ini_values().get("llm_provider") or ""
+        return [part.strip() for part in raw.replace(";", ",").split(",") if part.strip()]
+
+    def llm_provider_prefs(self, *, require_parameters: bool) -> dict:
+        prefs: dict = {"require_parameters": require_parameters}
+        providers = self.llm_providers()
+        if providers:
+            prefs["order"] = providers
+            prefs["only"] = providers
+            prefs["allow_fallbacks"] = False
+        return prefs
+
+    def llm_reasoning(self) -> str:
+        allowed = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+        raw = (ini_values().get("llm_reasoning") or "low").strip().lower()
+        return raw if raw in allowed else "low"
 
     def page_char_limit(self) -> int:
         try:

@@ -51,8 +51,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   for (let i = 0; i < bases.length; i++) {
     const canFallback = i < bases.length - 1;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    if (init.signal) {
+      init.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
     try {
-      const res = await fetch(`${bases[i]}${path}`, { ...init, headers });
+      const res = await fetch(`${bases[i]}${path}`, { ...init, headers, signal: controller.signal });
       const contentType = res.headers.get("content-type") || "";
       if (canFallback && isProxyFailure(res.status, contentType)) {
         continue;
@@ -74,17 +79,96 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
         }
         throw new ApiError(res.status, detailMessage(detail));
       }
+      if (!text.trim()) {
+        return {} as T;
+      }
       return JSON.parse(text) as T;
     } catch (err) {
       if (err instanceof ApiError) throw err;
-      lastNetworkError = err instanceof Error ? err.message : lastNetworkError;
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      lastNetworkError = aborted
+        ? "API timed out. Is the backend running?"
+        : err instanceof Error
+          ? err.message
+          : lastNetworkError;
       if (!canFallback) {
-        throw new ApiError(503, "Cannot reach the API server. Start the FastAPI backend on port 8000.");
+        throw new ApiError(503, lastNetworkError);
       }
+    } finally {
+      clearTimeout(timer);
     }
   }
 
   throw new ApiError(503, lastNetworkError);
+}
+
+export type ScanPipelineEvent = {
+  stage: string;
+  message: string;
+  level?: "log" | "info" | "warn" | "error";
+  [key: string]: unknown;
+};
+
+export async function scanStream(onEvent: (event: ScanPipelineEvent) => void): Promise<ScanPipelineEvent> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const bases = candidateBases();
+  let res: Response | null = null;
+  for (let i = 0; i < bases.length; i++) {
+    try {
+      const next = await fetch(`${bases[i]}/jobs/scan`, { method: "POST", headers });
+      const contentType = next.headers.get("content-type") || "";
+      if (i < bases.length - 1 && isProxyFailure(next.status, contentType)) {
+        continue;
+      }
+      res = next;
+      break;
+    } catch {
+      if (i === bases.length - 1) {
+        throw new ApiError(503, "Cannot reach the API server. Start the FastAPI backend on port 8000.");
+      }
+    }
+  }
+  if (!res) {
+    throw new ApiError(503, "Cannot reach the API server. Start the FastAPI backend on port 8000.");
+  }
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, detailMessage(body.detail));
+  }
+  if (!res.body) {
+    throw new ApiError(500, "Scan stream had no body");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let last: ScanPipelineEvent = { stage: "done", message: "Scan finished", ok: false };
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as ScanPipelineEvent;
+      last = event;
+      onEvent(event);
+    }
+    if (done) break;
+  }
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer) as ScanPipelineEvent;
+    last = event;
+    onEvent(event);
+  }
+  return last;
 }
 
 export const client = {
@@ -113,7 +197,8 @@ export const client = {
   leave: (id: number) => api<EventItem>(`/events/${id}/signup`, { method: "DELETE" }),
   decline: (id: number) => api<EventItem>(`/events/${id}/decline`, { method: "POST" }),
   myEvents: () => api<{ joined: EventItem[]; invited: EventItem[] }>("/me/events"),
-  scan: () => api<{ ok: boolean; reason?: string; created?: number; scanned_docs?: number }>("/jobs/scan", { method: "POST" }),
+  scan: () => scanStream(() => undefined),
+  scanStream,
   cluster: () => api<{ ok: boolean; clusters?: number; invites_created?: number }>("/jobs/cluster", { method: "POST" }),
   mapConfig: () =>
     api<{

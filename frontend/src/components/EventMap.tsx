@@ -72,7 +72,9 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 
       />
       <Recenter origin={center} />
       <ClickCapture onPick={onPick} />
-      {events.map((event) => (
+      {events
+        .filter((event) => Number.isFinite(event.location?.lat) && Number.isFinite(event.location?.lng))
+        .map((event) => (
         <Marker
           key={event.id}
           position={[event.location.lat, event.location.lng]}
@@ -86,7 +88,7 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 
               <p className="font-display text-sm text-cream">{event.title}</p>
               <p className="mt-1 text-[11px] text-mute">{formatWhen(event.starts_at)}</p>
               <p className="mt-1 text-[11px] text-gold">{event.cost_estimate}</p>
-              <p className="mt-1 text-[11px] capitalize text-cream/80">{event.tags.join(" · ")}</p>
+              <p className="mt-1 text-[11px] capitalize text-cream/80">{(event.tags || []).join(" · ")}</p>
             </div>
           </Tooltip>
         </Marker>

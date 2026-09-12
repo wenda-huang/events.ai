@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { client } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
+import { logApp, logScanEnd, logScanEvent, logScanStart } from "@/lib/devlog";
 
 function Settings() {
   const router = useRouter();
@@ -27,9 +28,23 @@ function Settings() {
     setBusy(true);
     setMessage("");
     try {
-      const res = kind === "scan" ? await client.scan() : await client.cluster();
-      setMessage(JSON.stringify(res));
+      if (kind === "scan") {
+        logScanStart();
+        setMessage("Scan running — open the browser console (F12) for live pipeline logs.");
+        const last = await client.scanStream((event) => {
+          logScanEvent(event);
+          setMessage(event.message);
+        });
+        logScanEnd();
+        setMessage(JSON.stringify(last));
+      } else {
+        logApp("cluster", "Starting user cluster job");
+        const res = await client.cluster();
+        logApp("cluster", "Cluster finished", res);
+        setMessage(JSON.stringify(res));
+      }
     } catch (err) {
+      if (kind === "scan") logScanEnd();
       setMessage(err instanceof Error ? err.message : "Job failed");
     } finally {
       setBusy(false);

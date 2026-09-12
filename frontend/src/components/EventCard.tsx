@@ -13,7 +13,7 @@ export function EventCard({ event }: { event: EventItem }) {
       <p className="mt-1 text-xs text-mute">{formatWhen(event.starts_at)}</p>
       <p className="mt-2 line-clamp-2 text-sm text-cream/80">{event.description}</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {event.tags.map((tag) => (
+        {event.tags?.map((tag) => (
           <span key={tag} className="rounded-full bg-ink px-2 py-0.5 text-[10px] uppercase tracking-wide text-gold">
             {tag}
           </span>

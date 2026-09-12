@@ -7,8 +7,24 @@ QUERIT_CONTENTS = "https://api.querit.ai/v1/contents"
 
 
 def search_city(city: str, count: int = 50) -> list[dict]:
-    query = f"upcoming local events concerts festivals meetups in {city} in the next two weeks"
-    return search(query, count=count)
+    queries = [
+        f"upcoming events concerts festivals meetups in {city} this week this weekend",
+        f"{city} event tickets venue show this week",
+        f"site:eventbrite.com/e OR site:allevents.in {city} events",
+    ]
+    merged: list[dict] = []
+    seen: set[str] = set()
+    per_query = max(10, count // len(queries) + 8)
+    for query in queries:
+        for item in search(query, count=per_query):
+            url = item.get("url") or ""
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            merged.append(item)
+            if len(merged) >= count:
+                return merged
+    return merged
 
 
 def search(query: str, count: int = 50) -> list[dict]:
@@ -22,7 +38,7 @@ def search(query: str, count: int = 50) -> list[dict]:
     payload = {
         "query": query,
         "count": count,
-        "date_range": "w4",
+        "date_range": "w2",
         "languages": ["english"],
     }
     try:

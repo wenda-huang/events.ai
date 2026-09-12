@@ -12,3 +12,5 @@ tile_url = https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.
 api_key =
 base_url = https://openrouter.ai/api/v1
 model = openai/gpt-4o-mini
+provider = google-vertex/global
+reasoning = low

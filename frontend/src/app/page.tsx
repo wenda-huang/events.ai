@@ -10,5 +10,9 @@ export default function HomePage() {
   useEffect(() => {
     router.replace(getToken() ? "/map" : "/login");
   }, [router]);
-  return null;
+  return (
+    <div className="grid h-dvh place-items-center bg-ink text-mute">
+      <p className="text-sm tracking-wide">Loading…</p>
+    </div>
+  );
 }
