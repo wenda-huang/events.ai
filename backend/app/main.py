@@ -8,6 +8,7 @@ from app.config import settings
 from app.database import Base, SessionLocal, engine, ensure_columns
 from app.routers import auth, events, jobs, users
 from app.seed import seed_if_empty
+from app.services.carto import public_tile_url
 from app.services.cluster import run_cluster
 from app.services.scan import run_scan
 
@@ -72,9 +73,10 @@ def health():
 
 @app.get("/config/public")
 def public_config():
+    carto_key = settings.secret("carto_api_key")
     return {
         "carto_api_base_url": settings.secret("carto_api_base_url") or settings.carto_api_base_url,
-        "tile_url": settings.secret("carto_tile_url") or settings.carto_tile_url,
-        "has_carto_key": bool(settings.secret("carto_api_key")),
+        "tile_url": public_tile_url(),
+        "has_carto_key": bool(carto_key),
         "has_querit_key": bool(settings.secret("querit_api_key")),
     }

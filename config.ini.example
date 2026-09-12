@@ -7,6 +7,7 @@ result_count = 50
 api_base_url = https://gcp-us-east1.api.carto.com
 api_key =
 tile_url = https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
+; api_key is sent as ?key= on tile_url. CARTO watermarks tiles that omit it.
 
 [openrouter]
 api_key =

@@ -1,6 +1,39 @@
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 import httpx
 
 from app.config import settings
+
+_TILE_KEY_ALIASES = {"key", "api_key", "apikey"}
+
+
+def append_basemap_key(url: str, api_key: str) -> str:
+    """Attach a CARTO basemap key so raster tiles are not watermarked."""
+    url = (url or "").strip()
+    key = (api_key or "").strip()
+    if key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    if not url:
+        return url
+    parts = urlsplit(url)
+    query = {name: value for name, value in parse_qsl(parts.query, keep_blank_values=True)}
+    existing = ""
+    for alias in ("key", "api_key", "apikey"):
+        value = (query.get(alias) or "").strip()
+        if value:
+            existing = value
+            break
+    token = existing or key
+    if not token:
+        return url
+    query = {name: value for name, value in query.items() if name.lower() not in _TILE_KEY_ALIASES}
+    query["key"] = token
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def public_tile_url() -> str:
+    url = settings.secret("carto_tile_url") or settings.carto_tile_url
+    return append_basemap_key(url, settings.secret("carto_api_key"))
 
 
 def _auth_header() -> str:

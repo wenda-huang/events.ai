@@ -48,15 +48,21 @@ type Props = {
 export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 }: Props) {
   const router = useRouter();
   const center = pick ?? origin;
-  const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
+  const [tileUrl, setTileUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     client
       .mapConfig()
       .then((config) => {
-        if (config.tile_url) setTileUrl(config.tile_url);
+        if (!cancelled) setTileUrl(config.tile_url || DEFAULT_TILES);
       })
-      .catch(() => setTileUrl(DEFAULT_TILES));
+      .catch(() => {
+        if (!cancelled) setTileUrl(DEFAULT_TILES);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -66,10 +72,15 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 
       className="h-full w-full"
       scrollWheelZoom
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
-        url={tileUrl}
-      />
+      {tileUrl && (
+        <TileLayer
+          key={tileUrl}
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
+          url={tileUrl}
+          subdomains="abcd"
+          maxZoom={20}
+        />
+      )}
       <Recenter origin={center} />
       <ClickCapture onPick={onPick} />
       {events

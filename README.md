@@ -23,4 +23,4 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Put Querit, Carto, and OpenRouter keys in `config.ini` at the repo root.
+Open `http://localhost:3000`. Put Querit, Carto, and OpenRouter keys in `config.ini` at the repo root. The Carto `api_key` is appended to map tile requests as `?key=` so CARTO does not watermark the basemap.
