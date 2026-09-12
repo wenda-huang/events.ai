@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  background: #14110e;
+  color: #f3ebe0;
+}
+
+body {
+  font-feature-settings: "kern" on;
+}
+
+.leaflet-container {
+  background: #1a1713;
+  font-family: inherit;
+}
+
+.leaflet-tooltip.event-tip {
+  background: #241f1a;
+  color: #f3ebe0;
+  border: 1px solid #3a3229;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  padding: 10px 12px;
+}
+
+.leaflet-tooltip.event-tip::before {
+  border-top-color: #3a3229;
+}
+
+.event-pin {
+  background: transparent;
+  border: none;
+}
+
+.pin-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, #f0a202 55%, #c44900);
+  box-shadow: 0 0 0 3px rgba(240, 162, 2, 0.25), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+input,
+textarea,
+select {
+  outline: none;
+}
+
+.field {
+  @apply w-full rounded-xl border border-line bg-ink px-3 py-2.5 text-sm text-cream placeholder:text-mute/70;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition;
+}
+
+.btn-gold {
+  @apply btn bg-gold text-ink hover:bg-[#ffb703];
+}
+
+.btn-ghost {
+  @apply btn border border-line bg-transparent text-cream hover:border-gold/60;
+}

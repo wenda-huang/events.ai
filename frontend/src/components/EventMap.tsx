@@ -1,0 +1,90 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import L from "leaflet";
+import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+
+import { formatWhen } from "@/lib/geo";
+import type { EventItem, Origin } from "@/lib/types";
+
+import "leaflet/dist/leaflet.css";
+
+const pin = L.divIcon({
+  className: "event-pin",
+  html: '<span class="pin-dot"></span>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
+function Recenter({ origin }: { origin: Origin }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([origin.lat, origin.lng], map.getZoom());
+  }, [map, origin.lat, origin.lng]);
+  return null;
+}
+
+function ClickCapture({ onPick }: { onPick?: (origin: Origin) => void }) {
+  useMapEvents({
+    click(e) {
+      onPick?.({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+  });
+  return null;
+}
+
+type Props = {
+  origin: Origin;
+  events?: EventItem[];
+  pick?: Origin | null;
+  onPick?: (origin: Origin) => void;
+  zoom?: number;
+};
+
+export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 }: Props) {
+  const router = useRouter();
+  const center = pick ?? origin;
+
+  return (
+    <MapContainer
+      center={[center.lat, center.lng]}
+      zoom={zoom}
+      className="h-full w-full"
+      scrollWheelZoom
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      />
+      <Recenter origin={center} />
+      <ClickCapture onPick={onPick} />
+      {events.map((event) => (
+        <Marker
+          key={event.id}
+          position={[event.location.lat, event.location.lng]}
+          icon={pin}
+          eventHandlers={{
+            click: () => router.push(`/events/${event.id}`),
+          }}
+        >
+          <Tooltip className="event-tip" direction="top" offset={[0, -10]} opacity={1}>
+            <div className="min-w-44">
+              <p className="font-display text-sm text-cream">{event.title}</p>
+              <p className="mt-1 text-[11px] text-mute">{formatWhen(event.starts_at)}</p>
+              <p className="mt-1 text-[11px] text-gold">{event.cost_estimate}</p>
+              <p className="mt-1 text-[11px] capitalize text-cream/80">{event.tags.join(" · ")}</p>
+            </div>
+          </Tooltip>
+        </Marker>
+      ))}
+      {pick && (
+        <Marker position={[pick.lat, pick.lng]} icon={pin}>
+          <Tooltip permanent className="event-tip">
+            New event
+          </Tooltip>
+        </Marker>
+      )}
+    </MapContainer>
+  );
+}
