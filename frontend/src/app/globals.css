@@ -187,9 +187,54 @@ select {
 }
 
 input[type="range"] {
-  accent-color: #c4a574;
+  appearance: none;
   height: 6px;
   cursor: pointer;
+  background: #c4a574;
+  border-radius: 999px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #c4a574;
+  border-radius: 999px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border: none;
+  border-radius: 999px;
+  background: #c4a574;
+  box-shadow: none;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:active {
+  background: #c4a574;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: #c4a574;
+  border-radius: 999px;
+  border: none;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 999px;
+  background: #c4a574;
+  box-shadow: none;
+}
+
+input[type="range"]::-moz-range-thumb:hover,
+input[type="range"]::-moz-range-thumb:active {
+  background: #c4a574;
 }
 
 .field {

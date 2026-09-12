@@ -40,7 +40,7 @@ function SearchMatchRow({ event }: { event: EventItem }) {
       href={`/events/${event.id}`}
       className="flex gap-3 rounded-xl border border-line bg-card/80 p-2 hover:border-gold/50"
     >
-      <EventCover tags={event.tags} title={`${event.tags?.[0] || "Event"} cover`} className="h-16 w-24 shrink-0 rounded-lg" />
+      <EventCover tags={event.tags} title={`${event.tags?.[0] || "Event"} cover`} showTag={false} className="h-16 w-24 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <p className="font-display text-sm leading-tight text-cream">{event.title}</p>
