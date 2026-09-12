@@ -74,7 +74,7 @@ def health():
 def public_config():
     return {
         "carto_api_base_url": settings.secret("carto_api_base_url") or settings.carto_api_base_url,
-        "tile_url": settings.secret("carto_tile_url") or settings.carto_tile_url,
+        "tile_url": settings.carto_tile_url_with_key(),
         "has_carto_key": bool(settings.secret("carto_api_key")),
         "has_querit_key": bool(settings.secret("querit_api_key")),
     }

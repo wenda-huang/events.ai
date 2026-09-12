@@ -1,5 +1,6 @@
 from configparser import ConfigParser
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,6 +30,7 @@ def ini_values() -> dict[str, str]:
         values["result_count"] = parser.get("querit", "result_count", fallback="50").strip()
     if parser.has_section("carto"):
         values["carto_api_key"] = parser.get("carto", "api_key", fallback="").strip()
+        values["carto_basemap_key"] = parser.get("carto", "basemap_key", fallback="").strip()
         values["carto_api_base_url"] = parser.get("carto", "api_base_url", fallback="").strip()
         values["carto_tile_url"] = parser.get("carto", "tile_url", fallback="").strip()
     if parser.has_section("openrouter"):
@@ -61,6 +63,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openai_api_key: str = ""
     carto_api_key: str = ""
+    carto_basemap_key: str = ""
     carto_api_base_url: str = _DEFAULT_CARTO_URL
     carto_tile_url: str = _DEFAULT_TILES
 
@@ -69,6 +72,17 @@ class Settings(BaseSettings):
         if current:
             return current
         return ini_values().get(name, "")
+
+    def carto_tile_url_with_key(self) -> str:
+        url = self.secret("carto_tile_url") or self.carto_tile_url or _DEFAULT_TILES
+        key = self.secret("carto_basemap_key") or self.secret("carto_api_key")
+        if not key:
+            return url
+        parts = urlsplit(url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        if not query.get("key") and not query.get("api_key"):
+            query["key"] = key
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
     def llm_api_key(self) -> str:
         return (
