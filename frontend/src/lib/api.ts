@@ -1,7 +1,7 @@
 import { clearToken, getToken } from "@/lib/auth";
 import type { EventItem, User } from "@/lib/types";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "");
 
 export class ApiError extends Error {
   status: number;
@@ -21,6 +21,24 @@ function detailMessage(detail: unknown): string {
   return "Request failed";
 }
 
+function candidateBases(): string[] {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "");
+  if (configured) return [configured];
+  const bases = ["/api"];
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") {
+      bases.push(`${protocol}//127.0.0.1:8000`, `${protocol}//localhost:8000`);
+    }
+  }
+  return [...new Set(bases)];
+}
+
+function isProxyFailure(status: number, contentType: string): boolean {
+  if (status === 502 || status === 503 || status === 504) return true;
+  return status === 500 && !contentType.includes("application/json");
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) {
@@ -28,18 +46,45 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
-  if (res.status === 401) {
-    clearToken();
-    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-      window.location.href = "/login";
+  const bases = candidateBases();
+  let lastNetworkError = "Cannot reach the API server. Start the FastAPI backend on port 8000.";
+
+  for (let i = 0; i < bases.length; i++) {
+    const canFallback = i < bases.length - 1;
+    try {
+      const res = await fetch(`${bases[i]}${path}`, { ...init, headers });
+      const contentType = res.headers.get("content-type") || "";
+      if (canFallback && isProxyFailure(res.status, contentType)) {
+        continue;
+      }
+      const text = await res.text();
+      if (res.status === 401) {
+        clearToken();
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+          window.location.href = "/login";
+        }
+      }
+      if (!res.ok) {
+        let detail: unknown = res.statusText;
+        try {
+          const parsed = JSON.parse(text) as { detail?: unknown };
+          detail = parsed.detail ?? parsed;
+        } catch {
+          detail = text.trim() || res.statusText;
+        }
+        throw new ApiError(res.status, detailMessage(detail));
+      }
+      return JSON.parse(text) as T;
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      lastNetworkError = err instanceof Error ? err.message : lastNetworkError;
+      if (!canFallback) {
+        throw new ApiError(503, "Cannot reach the API server. Start the FastAPI backend on port 8000.");
+      }
     }
   }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, detailMessage(body.detail));
-  }
-  return res.json() as Promise<T>;
+
+  throw new ApiError(503, lastNetworkError);
 }
 
 export const client = {

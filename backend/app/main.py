@@ -47,9 +47,13 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="events.ai", lifespan=lifespan)
 origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+for origin in ("http://localhost:3000", "http://127.0.0.1:3000"):
+    if origin not in origins:
+        origins.append(origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or ["http://localhost:3000"],
+    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
