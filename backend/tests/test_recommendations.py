@@ -1,6 +1,6 @@
 import unittest
 
-from app.routers.events import interest_overlap, recommend_sort_key
+from app.routers.events import interest_overlap, recommend_sort_key, search_and_distance_origins
 
 
 class InterestRankingTests(unittest.TestCase):
@@ -17,6 +17,15 @@ class InterestRankingTests(unittest.TestCase):
         ]
         ranked = sorted(events, key=recommend_sort_key)
         self.assertEqual([e["title"] for e in ranked], ["Closer food", "Nearby food", "Far tech"])
+
+    def test_radius_center_can_differ_from_distance_origin(self):
+        search, distance = search_and_distance_origins(40.44, -80.0, 40.5, -79.9)
+        self.assertEqual(search, (40.44, -80.0))
+        self.assertEqual(distance, (40.5, -79.9))
+
+    def test_distance_origin_defaults_to_search_center(self):
+        search, distance = search_and_distance_origins(40.44, -80.0)
+        self.assertEqual(search, distance)
 
 
 if __name__ == "__main__":
