@@ -99,7 +99,7 @@ function MapView() {
 
   return (
     <div className="relative min-h-0 flex-1">
-      <EventMap origin={origin} events={events} />
+      <EventMap origin={origin} events={events} onMapClick={() => setRecommendedExpanded(false)} />
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
@@ -178,11 +178,15 @@ function MapView() {
             }
           }}
           className={`pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col p-4 transition-[top,height] duration-300 ease-out ${
-            recommendedExpanded ? "" : "h-[22vh]"
+            recommendedExpanded ? "" : "h-auto"
           }`}
           style={recommendedExpanded ? { top: searchOverlayHeight } : undefined}
         >
-          <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
+          <div
+            className={`pointer-events-auto mx-auto flex min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur ${
+              recommendedExpanded ? "h-full" : ""
+            }`}
+          >
             <div className="mb-2 flex shrink-0 items-center justify-between">
               <p className="text-[11px] uppercase tracking-[0.2em] text-gold">
                 Recommended
@@ -200,7 +204,10 @@ function MapView() {
                 <Chevron open={recommendedExpanded} />
               </button>
             </div>
-            <div ref={recommendedListRef} className="min-h-0 flex-1 space-y-2 overflow-auto">
+            <div
+              ref={recommendedListRef}
+              className={`min-h-0 space-y-2 ${recommendedExpanded ? "flex-1 overflow-auto" : "overflow-hidden"}`}
+            >
               {visibleRecommended.map((event) => (
                 <EventCard key={event.id} event={event} />
               ))}

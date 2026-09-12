@@ -28,9 +28,16 @@ function Recenter({ origin }: { origin: Origin }) {
   return null;
 }
 
-function ClickCapture({ onPick }: { onPick?: (origin: Origin) => void }) {
+function ClickCapture({
+  onPick,
+  onMapClick,
+}: {
+  onPick?: (origin: Origin) => void;
+  onMapClick?: () => void;
+}) {
   useMapEvents({
     click(e) {
+      onMapClick?.();
       onPick?.({ lat: e.latlng.lat, lng: e.latlng.lng });
     },
   });
@@ -42,10 +49,11 @@ type Props = {
   events?: EventItem[];
   pick?: Origin | null;
   onPick?: (origin: Origin) => void;
+  onMapClick?: () => void;
   zoom?: number;
 };
 
-export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 }: Props) {
+export default function EventMap({ origin, events = [], pick, onPick, onMapClick, zoom = 13 }: Props) {
   const router = useRouter();
   const center = pick ?? origin;
   const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
@@ -71,7 +79,7 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 
         url={tileUrl}
       />
       <Recenter origin={center} />
-      <ClickCapture onPick={onPick} />
+      <ClickCapture onPick={onPick} onMapClick={onMapClick} />
       {events
         .filter((event) => Number.isFinite(event.location?.lat) && Number.isFinite(event.location?.lng))
         .map((event) => (
