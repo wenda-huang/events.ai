@@ -237,9 +237,10 @@ type Props = {
   tags?: string[] | null;
   className?: string;
   title?: string;
+  showTag?: boolean;
 };
 
-export function EventCover({ tags, className = "", title }: Props) {
+export function EventCover({ tags, className = "", title, showTag = true }: Props) {
   const uid = useId().replace(/:/g, "");
   const tag = coverTag(tags);
   const p = PALETTES[tag];
@@ -264,9 +265,11 @@ export function EventCover({ tags, className = "", title }: Props) {
         <Motif tag={tag} p={p} />
         <rect width="640" height="360" fill="#241f1a" opacity="0.08" />
       </svg>
-      <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-night/55 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/90">
-        {tag}
-      </span>
+      {showTag && (
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-night/55 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/90">
+          {tag}
+        </span>
+      )}
     </div>
   );
 }
