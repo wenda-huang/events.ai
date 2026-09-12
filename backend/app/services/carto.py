@@ -14,14 +14,6 @@ def _base_url() -> str:
     return (settings.secret("carto_api_base_url") or "https://gcp-us-east1.api.carto.com").rstrip("/")
 
 
-def _params(**kwargs: object) -> dict[str, object]:
-    params: dict[str, object] = {key: value for key, value in kwargs.items() if value is not None}
-    key = settings.secret("carto_api_key")
-    if key:
-        params["api_key"] = key
-    return params
-
-
 def geocode_address(address: str) -> tuple[float, float] | None:
     if not settings.secret("carto_api_key"):
         return None
@@ -29,7 +21,7 @@ def geocode_address(address: str) -> tuple[float, float] | None:
         with httpx.Client(timeout=20) as client:
             res = client.get(
                 _base_url() + "/v3/lds/geocoding/geocode",
-                params=_params(address=address),
+                params={"address": address},
                 headers={"Authorization": _auth_header()},
             )
             res.raise_for_status()
@@ -46,7 +38,7 @@ def reverse_city(lat: float, lng: float) -> str | None:
         with httpx.Client(timeout=20) as client:
             res = client.get(
                 _base_url() + "/v3/lds/geocoding/reverse",
-                params=_params(latitude=lat, longitude=lng),
+                params={"latitude": lat, "longitude": lng},
                 headers={"Authorization": _auth_header()},
             )
             res.raise_for_status()
