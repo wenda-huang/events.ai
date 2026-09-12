@@ -42,7 +42,9 @@ function MapView() {
   const recHeaderRef = useRef<HTMLDivElement>(null);
   const firstCardRef = useRef<HTMLDivElement>(null);
   const searchOverlayRef = useRef<HTMLDivElement>(null);
+  const filterInnerRef = useRef<HTMLDivElement>(null);
   const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
+  const [filterHeight, setFilterHeight] = useState(0);
   const [panelHeight, setPanelHeight] = useState<number>();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
@@ -98,7 +100,17 @@ function MapView() {
     const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [showFilters]);
+  }, [showFilters, filterHeight]);
+
+  useLayoutEffect(() => {
+    const inner = filterInnerRef.current;
+    if (!inner) return;
+    const apply = () => setFilterHeight(showFilters ? inner.scrollHeight : 0);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [showFilters, allTags]);
 
   useLayoutEffect(() => {
     const mapHeight = mapAreaRef.current?.clientHeight ?? 0;
@@ -149,8 +161,16 @@ function MapView() {
               <Chevron open={showFilters} />
             </button>
           </div>
-          {showFilters && (
-            <div className="mt-2 space-y-3 border-t border-line pt-2">
+          <div
+            className="overflow-hidden transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            style={{ height: filterHeight }}
+            aria-hidden={!showFilters}
+            inert={!showFilters}
+          >
+            <div
+              ref={filterInnerRef}
+              className={`mt-2 space-y-3 border-t border-line pt-2 ${showFilters ? "" : "pointer-events-none"}`}
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex items-center gap-2 text-xs text-mute">
                   From
@@ -173,7 +193,7 @@ function MapView() {
                 <TagPicker tags={allTags} selected={filterTags} onChange={setFilterTags} />
               </div>
             </div>
-          )}
+          </div>
           <div className="mt-2 flex items-center justify-between text-xs text-mute">
             <span>
               {events.length} events · default window is 2 weeks
