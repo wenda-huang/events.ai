@@ -2,10 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-
-import { client } from "@/lib/api";
-import { defaultCity, resolveOrigin } from "@/lib/geo";
 
 const LINKS = [
   { href: "/map", label: "Map" },
@@ -16,19 +12,6 @@ const LINKS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [cityLabel, setCityLabel] = useState("");
-
-  useEffect(() => {
-    Promise.all([client.cities(), client.me()])
-      .then(([cityRes, me]) => {
-        if (me.lat != null && me.lng != null) {
-          setCityLabel(resolveOrigin({ lat: me.lat, lng: me.lng }, cityRes.cities).city?.label ?? "");
-        } else {
-          setCityLabel(defaultCity(cityRes.cities)?.label ?? "");
-        }
-      })
-      .catch(() => undefined);
-  }, []);
 
   return (
     <aside className="flex h-full w-[240px] shrink-0 flex-col border-r border-line bg-panel px-5 py-6">
@@ -36,7 +19,6 @@ export function Sidebar() {
         <p className="font-display text-2xl tracking-tight text-cream">
           events<span className="text-gold">.ai</span>
         </p>
-        <p className="mt-1 text-[11px] uppercase tracking-[0.22em] text-mute">{cityLabel || "Meetups"}</p>
       </Link>
       <nav className="flex flex-1 flex-col gap-1">
         {LINKS.map((link) => {
