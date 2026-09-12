@@ -190,13 +190,25 @@ input[type="range"] {
   appearance: none;
   height: 6px;
   cursor: pointer;
-  background: #c4a574;
   border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #c4a574 0%,
+    #c4a574 var(--range-progress, 0%),
+    #e2d5bf var(--range-progress, 0%),
+    #e2d5bf 100%
+  );
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  background: #c4a574;
+  background: linear-gradient(
+    to right,
+    #c4a574 0%,
+    #c4a574 var(--range-progress, 0%),
+    #e2d5bf var(--range-progress, 0%),
+    #e2d5bf 100%
+  );
   border-radius: 999px;
 }
 
@@ -218,9 +230,15 @@ input[type="range"]::-webkit-slider-thumb:active {
 
 input[type="range"]::-moz-range-track {
   height: 6px;
-  background: #c4a574;
+  background: #e2d5bf;
   border-radius: 999px;
   border: none;
+}
+
+input[type="range"]::-moz-range-progress {
+  height: 6px;
+  background: #c4a574;
+  border-radius: 999px;
 }
 
 input[type="range"]::-moz-range-thumb {
