@@ -11,6 +11,7 @@ from app.models import City, Event, EventMembership, User
 from app.schemas import EventCreate
 from app.serialize import dump_tags, event_public, parse_tags
 from app.services import auto_invite, geocode
+from app.services.notifications import notify_join
 from app.services.search import MIN_SCORE, expand_query, score_event
 from app.tags import normalize_tags
 
@@ -271,6 +272,7 @@ def signup(
     event = _get_event(db, event_id)
     joined = [m for m in event.memberships if m.status == "joined"]
     mine = next((m for m in event.memberships if m.user_id == user.id), None)
+    was_joined = mine is not None and mine.status == "joined"
     if mine is None or mine.status != "joined":
         if len(joined) >= event.people_max:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event is full")
@@ -279,6 +281,8 @@ def signup(
         db.add(mine)
     else:
         mine.status = "joined"
+    if not was_joined:
+        notify_join(db, event=event, actor=user)
     db.commit()
     event = _get_event(db, event_id)
     return event_public(event, current_user_id=user.id)
