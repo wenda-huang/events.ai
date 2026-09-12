@@ -70,4 +70,11 @@ export const client = {
   myEvents: () => api<{ joined: EventItem[]; invited: EventItem[] }>("/me/events"),
   scan: () => api<{ ok: boolean; reason?: string; created?: number; scanned_docs?: number }>("/jobs/scan", { method: "POST" }),
   cluster: () => api<{ ok: boolean; clusters?: number; invites_created?: number }>("/jobs/cluster", { method: "POST" }),
+  mapConfig: () =>
+    api<{
+      carto_api_base_url: string;
+      tile_url: string;
+      has_carto_key: boolean;
+      has_querit_key: boolean;
+    }>("/config/public"),
 };

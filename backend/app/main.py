@@ -63,3 +63,13 @@ app.include_router(jobs.router)
 @app.get("/health")
 def health():
     return {"ok": True, "city": "Pittsburgh"}
+
+
+@app.get("/config/public")
+def public_config():
+    return {
+        "carto_api_base_url": settings.carto_api_base_url,
+        "tile_url": settings.carto_tile_url,
+        "has_carto_key": bool(settings.carto_api_key),
+        "has_querit_key": bool(settings.querit_api_key),
+    }

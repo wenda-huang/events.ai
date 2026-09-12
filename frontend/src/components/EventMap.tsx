@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import L from "leaflet";
 import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 
+import { client } from "@/lib/api";
 import { formatWhen } from "@/lib/geo";
 import type { EventItem, Origin } from "@/lib/types";
 
 import "leaflet/dist/leaflet.css";
+
+const DEFAULT_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
 const pin = L.divIcon({
   className: "event-pin",
@@ -45,6 +48,16 @@ type Props = {
 export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 }: Props) {
   const router = useRouter();
   const center = pick ?? origin;
+  const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
+
+  useEffect(() => {
+    client
+      .mapConfig()
+      .then((config) => {
+        if (config.tile_url) setTileUrl(config.tile_url);
+      })
+      .catch(() => setTileUrl(DEFAULT_TILES));
+  }, []);
 
   return (
     <MapContainer
@@ -55,7 +68,7 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={tileUrl}
       />
       <Recenter origin={center} />
       <ClickCapture onPick={onPick} />
