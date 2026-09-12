@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
+import { EventCover } from "@/components/EventCover";
 import { RequireAuth } from "@/components/RequireAuth";
 import { client } from "@/lib/api";
 import { formatWhen } from "@/lib/geo";
@@ -56,12 +57,17 @@ function EventDetail() {
         {event.source === "ai" ? "AI-discovered" : "Posted by a neighbor"} · {event.location.city}
       </p>
       <h1 className="mt-2 font-display text-5xl leading-tight text-cream">{event.title}</h1>
-        <p className="mt-4 text-mute">
-          {formatWhen(event.starts_at)} — {formatWhen(event.ends_at)}
-          {event.estimated_fields?.includes("ends_at") && (
-            <span className="ml-2 text-[10px] uppercase tracking-wide text-gold">end estimated</span>
-          )}
-        </p>
+      <EventCover
+        tags={event.tags}
+        title={`${event.tags?.[0] || "Event"} cover`}
+        className="mt-6 aspect-[16/9] w-full rounded-3xl border border-line"
+      />
+      <p className="mt-4 text-mute">
+        {formatWhen(event.starts_at)} — {formatWhen(event.ends_at)}
+        {event.estimated_fields?.includes("ends_at") && (
+          <span className="ml-2 text-[10px] uppercase tracking-wide text-gold">end estimated</span>
+        )}
+      </p>
       <p className="mt-2 text-sm text-cream/80">{event.location.address}</p>
       <div className="mt-6 flex flex-wrap gap-2">
         {event.tags.map((tag) => (
