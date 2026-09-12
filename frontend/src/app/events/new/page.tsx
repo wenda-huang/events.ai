@@ -8,8 +8,8 @@ import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
-import { defaultWindow, PITTSBURGH } from "@/lib/geo";
-import type { Origin } from "@/lib/types";
+import { DEFAULT_ORIGIN, defaultWindow, nearestCity } from "@/lib/geo";
+import type { City, Origin } from "@/lib/types";
 
 const EventMap = dynamic(() => import("@/components/EventMap"), { ssr: false });
 
@@ -26,12 +26,14 @@ function CreateEvent() {
   const [peopleMin, setPeopleMin] = useState(2);
   const [peopleMax, setPeopleMax] = useState(12);
   const [cost, setCost] = useState("Free");
-  const [pick, setPick] = useState<Origin>(PITTSBURGH);
+  const [pick, setPick] = useState<Origin>(DEFAULT_ORIGIN);
+  const [cities, setCities] = useState<City[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     client.tags().then((res) => setTags(res.tags));
+    client.cities().then((res) => setCities(res.cities));
     client.me().then((me) => {
       if (me.lat != null && me.lng != null) setPick({ lat: me.lat, lng: me.lng });
     });
@@ -42,11 +44,13 @@ function CreateEvent() {
     setBusy(true);
     setError("");
     try {
+      const city = nearestCity(pick, cities);
       const created = await client.createEvent({
         title,
         description,
         address,
-        city: "Pittsburgh",
+        city: city?.name ?? "",
+        city_id: city?.id,
         lat: pick.lat,
         lng: pick.lng,
         starts_at: new Date(starts).toISOString(),

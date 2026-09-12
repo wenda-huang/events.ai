@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.cities import default_city, implemented_cities
 from app.database import get_db
-from app.geo import PITTSBURGH_LAT, PITTSBURGH_LNG
+from app.geo import DEFAULT_LAT, DEFAULT_LNG
 from app.models import User
 from app.schemas import OnboardingIn, ProfilePatch
-from app.serialize import dump_tags, user_public
+from app.serialize import city_public, dump_tags, user_public
 from app.tags import TAG_DICTIONARY, normalize_tags
 
 router = APIRouter(tags=["users"])
@@ -17,6 +18,11 @@ router = APIRouter(tags=["users"])
 @router.get("/tags")
 def list_tags():
     return {"tags": TAG_DICTIONARY}
+
+
+@router.get("/cities")
+def list_cities(db: Session = Depends(get_db)):
+    return {"cities": [city_public(city) for city in implemented_cities(db)]}
 
 
 @router.get("/me")
@@ -56,8 +62,9 @@ def onboard(
     user.name = body.name.strip()
     user.phone = (body.phone or "").strip() or None
     user.tags = dump_tags(normalize_tags(body.tags))
-    user.lat = body.lat if body.lat is not None else PITTSBURGH_LAT
-    user.lng = body.lng if body.lng is not None else PITTSBURGH_LNG
+    city = default_city(db)
+    user.lat = body.lat if body.lat is not None else (city.lat if city else DEFAULT_LAT)
+    user.lng = body.lng if body.lng is not None else (city.lng if city else DEFAULT_LNG)
     user.onboarded_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(user)

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
-import { PITTSBURGH } from "@/lib/geo";
+import { DEFAULT_ORIGIN, defaultCity } from "@/lib/geo";
 
 function OnboardingForm() {
   const router = useRouter();
@@ -14,9 +14,9 @@ function OnboardingForm() {
   const [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [lat, setLat] = useState<number>(PITTSBURGH.lat);
-  const [lng, setLng] = useState<number>(PITTSBURGH.lng);
-  const [locLabel, setLocLabel] = useState("Using downtown Pittsburgh");
+  const [lat, setLat] = useState<number>(DEFAULT_ORIGIN.lat);
+  const [lng, setLng] = useState<number>(DEFAULT_ORIGIN.lng);
+  const [locLabel, setLocLabel] = useState("Finding your city…");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -25,16 +25,32 @@ function OnboardingForm() {
     client.me().then((me) => {
       if (me.name) setName(me.name);
     });
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude);
-        setLng(pos.coords.longitude);
-        setLocLabel("Using your current location");
-      },
-      () => setLocLabel("Location blocked — using downtown Pittsburgh"),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    client.cities().then((res) => {
+      const fallback = defaultCity(res.cities);
+      if (!navigator.geolocation) {
+        if (fallback) {
+          setLat(fallback.lat);
+          setLng(fallback.lng);
+          setLocLabel(`Using downtown ${fallback.label}`);
+        }
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLat(pos.coords.latitude);
+          setLng(pos.coords.longitude);
+          setLocLabel("Using your current location");
+        },
+        () => {
+          if (fallback) {
+            setLat(fallback.lat);
+            setLng(fallback.lng);
+            setLocLabel(`Location blocked — using downtown ${fallback.label}`);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
   }, []);
 
   async function onSubmit(e: FormEvent) {

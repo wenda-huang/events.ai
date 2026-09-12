@@ -25,6 +25,23 @@ class User(Base):
     memberships: Mapped[list["EventMembership"]] = relationship(back_populates="user")
 
 
+class City(Base):
+    __tablename__ = "cities"
+    __table_args__ = (UniqueConstraint("name", "state", name="uq_city_name_state"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    state: Mapped[str] = mapped_column(String(2))
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+
+    events: Mapped[list["Event"]] = relationship(back_populates="city_row")
+
+    @property
+    def label(self) -> str:
+        return f"{self.name}, {self.state}"
+
+
 class Event(Base):
     __tablename__ = "events"
 
@@ -34,7 +51,8 @@ class Event(Base):
     lat: Mapped[float] = mapped_column(Float)
     lng: Mapped[float] = mapped_column(Float)
     address: Mapped[str] = mapped_column(String(300), default="")
-    city: Mapped[str] = mapped_column(String(80), default="Pittsburgh")
+    city: Mapped[str] = mapped_column(String(80), default="")
+    city_id: Mapped[int | None] = mapped_column(ForeignKey("cities.id"), nullable=True, index=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     ends_at: Mapped[datetime] = mapped_column(DateTime)
     people_min: Mapped[int] = mapped_column(Integer, default=2)
@@ -48,6 +66,7 @@ class Event(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     creator: Mapped[User | None] = relationship(back_populates="events_created")
+    city_row: Mapped["City | None"] = relationship(back_populates="events")
     memberships: Mapped[list["EventMembership"]] = relationship(
         back_populates="event", cascade="all, delete-orphan"
     )

@@ -1,8 +1,10 @@
 from math import atan2, cos, radians, sin, sqrt
 
 EARTH_MI = 3958.8
-PITTSBURGH_LAT = 40.4406
-PITTSBURGH_LNG = -79.9959
+DEFAULT_LAT = 40.4406
+DEFAULT_LNG = -79.9959
+PITTSBURGH_LAT = DEFAULT_LAT
+PITTSBURGH_LNG = DEFAULT_LNG
 
 
 def haversine_mi(lat1: float, lng1: float, lat2: float, lng2: float) -> float:

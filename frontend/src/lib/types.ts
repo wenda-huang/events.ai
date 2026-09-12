@@ -8,6 +8,16 @@ export type User = {
   tags: string[];
   onboarded: boolean;
   default_radius_mi: number;
+  is_admin: boolean;
+};
+
+export type City = {
+  id: number;
+  name: string;
+  state: string;
+  lat: number;
+  lng: number;
+  label: string;
 };
 
 export type EventItem = {

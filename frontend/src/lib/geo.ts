@@ -1,6 +1,7 @@
-import type { Origin } from "@/lib/types";
+import type { City, Origin } from "@/lib/types";
 
-export const PITTSBURGH: Origin = { lat: 40.4406, lng: -79.9959 };
+export const DEFAULT_ORIGIN: Origin = { lat: 40.4406, lng: -79.9959 };
+export const CITY_SNAP_MI = 25;
 
 export function haversineMi(a: Origin, b: Origin): number {
   const r = 3958.8;
@@ -12,10 +13,27 @@ export function haversineMi(a: Origin, b: Origin): number {
   return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-export function resolveOrigin(coords: Origin | null): { origin: Origin; outsideCity: boolean } {
-  if (!coords) return { origin: PITTSBURGH, outsideCity: false };
-  const outsideCity = haversineMi(coords, PITTSBURGH) > 25;
-  return { origin: outsideCity ? PITTSBURGH : coords, outsideCity };
+export function defaultCity(cities: City[]): City | undefined {
+  return cities.find((city) => city.name === "Pittsburgh" && city.state === "PA") ?? cities[0];
+}
+
+export function nearestCity(coords: Origin, cities: City[]): City | undefined {
+  if (cities.length === 0) return undefined;
+  return cities.reduce((best, city) => (haversineMi(coords, city) < haversineMi(coords, best) ? city : best));
+}
+
+export function resolveOrigin(coords: Origin | null, cities: City[] = []): { origin: Origin; outsideCity: boolean; city?: City } {
+  const fallback = defaultCity(cities);
+  const fallbackOrigin = fallback ? { lat: fallback.lat, lng: fallback.lng } : DEFAULT_ORIGIN;
+  if (!coords) return { origin: fallbackOrigin, outsideCity: false, city: fallback };
+  const nearest = nearestCity(coords, cities);
+  if (!nearest) return { origin: coords, outsideCity: false };
+  const outsideCity = haversineMi(coords, nearest) > CITY_SNAP_MI;
+  return {
+    origin: outsideCity ? { lat: nearest.lat, lng: nearest.lng } : coords,
+    outsideCity,
+    city: nearest,
+  };
 }
 
 export function formatWhen(iso: string): string {

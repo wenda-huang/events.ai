@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from collections.abc import Iterator
@@ -5,12 +6,14 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.cities import implemented_cities, match_city
 from app.config import settings
-from app.models import Event, User
+from app.models import City, Event, User
 from app.serialize import dump_tags
 from app.services import geocode, llm, querit
 
 log = logging.getLogger("events.scan")
+COMMIT_EVERY = 20
 
 
 def _naive(value: str | datetime) -> datetime | None:
@@ -38,30 +41,8 @@ def _event(stage: str, message: str, level: str = "info", **data: object) -> dic
     return payload
 
 
-def city_for_user(user: User | None) -> str:
-    if user is not None and user.lat is not None and user.lng is not None:
-        city = geocode.reverse_city(user.lat, user.lng)
-        if city:
-            return city
-    return "Pittsburgh"
-
-
-def cities_to_scan(db: Session, user: User | None) -> list[str]:
-    if user is not None:
-        return [city_for_user(user)]
-    cities: list[str] = []
-    seen: set[str] = set()
-    rows = db.query(User).filter(User.onboarded_at.isnot(None), User.lat.isnot(None), User.lng.isnot(None)).all()
-    for row in rows:
-        city = city_for_user(row)
-        key = city.lower()
-        if key not in seen:
-            seen.add(key)
-            cities.append(city)
-    return cities or ["Pittsburgh"]
-
-
 def iter_scan(db: Session, user: User | None = None) -> Iterator[dict]:
+    del user
     if not settings.secret("querit_api_key"):
         yield _event("error", "QUERIT_API_KEY missing", level="error", ok=False, created=0)
         return
@@ -69,20 +50,34 @@ def iter_scan(db: Session, user: User | None = None) -> Iterator[dict]:
         yield _event("error", "OpenRouter API key missing — add it under [openrouter] in config.ini", level="error", ok=False, created=0)
         return
 
-    cities = cities_to_scan(db, user)
+    cities = implemented_cities(db)
+    if not cities:
+        yield _event("error", "No implemented cities in the cities table", level="error", ok=False, created=0)
+        return
+
     char_limit = settings.page_char_limit()
     result_count = settings.result_count()
+    search_workers = min(settings.search_concurrency(), len(cities))
+    fetch_workers = settings.fetch_concurrency()
+    llm_concurrency = settings.llm_concurrency()
+    crawl_timeout = settings.crawl_timeout()
     created = 0
     scanned_docs = 0
     summarized = 0
     skipped = 0
+    pending_commits = 0
+    city_labels = [city.label for city in cities]
 
     yield _event(
         "start",
         "Starting event scan pipeline",
-        cities=cities,
+        cities=city_labels,
         result_count=result_count,
         page_char_limit=char_limit,
+        search_workers=search_workers,
+        fetch_workers=fetch_workers,
+        llm_concurrency=llm_concurrency,
+        crawl_timeout=crawl_timeout,
         model=settings.llm_model(),
         provider=",".join(settings.llm_providers()) or "auto",
         reasoning=settings.llm_reasoning(),
@@ -93,83 +88,124 @@ def iter_scan(db: Session, user: User | None = None) -> Iterator[dict]:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     horizon = now + timedelta(days=21)
 
-    for city in cities:
-        yield _event("city", f"Scanning city: {city}", city=city)
-        hits = querit.search_city(city, count=result_count)
-        yield _event("querit", f"Querit returned {len(hits)} hits", count=len(hits), city=city)
-
-        documents = []
-        urls = []
-        for item in hits:
-            url = item.get("url") or ""
-            if not url:
-                continue
-            if _spam_url(url):
+    queued: list[tuple[City, list[dict]]] = []
+    yield _event("querit", f"Searching {len(cities)} cities in parallel", cities=city_labels, workers=search_workers)
+    with ThreadPoolExecutor(max_workers=search_workers) as pool:
+        futures = {pool.submit(querit.search_city, city.label, result_count): city for city in cities}
+        for future in as_completed(futures):
+            city = futures[future]
+            try:
+                hits = future.result() or []
+            except Exception as exc:
                 skipped += 1
-                yield _event("skip", "Spam or clone calendar URL", level="warn", url=url, title=item.get("title") or "")
+                yield _event("skip", f"Querit search failed for {city.label}", level="warn", city=city.label, reason=str(exc))
+                queued.append((city, []))
                 continue
-            if url in existing_urls:
-                skipped += 1
-                yield _event("skip", "Already in database", level="warn", url=url, title=item.get("title") or "")
-                continue
-            existing_urls.add(url)
-            documents.append(item)
-            urls.append(url)
-        scanned_docs += len(documents)
-        yield _event("pages", f"Fetching page text for {len(urls)} URLs", count=len(urls), char_limit=char_limit)
-        pages = querit.fetch_contents(urls, char_limit=char_limit)
-        yield _event("pages", f"Got text for {len(pages)}/{len(urls)} pages", fetched=len(pages), requested=len(urls))
+            yield _event("querit", f"Querit returned {len(hits)} hits", count=len(hits), city=city.label)
+            documents = []
+            for item in hits:
+                url = item.get("url") or ""
+                if not url:
+                    continue
+                if _spam_url(url):
+                    skipped += 1
+                    yield _event("skip", "Spam or clone calendar URL", level="warn", url=url, title=item.get("title") or "", city=city.label)
+                    continue
+                if url in existing_urls:
+                    skipped += 1
+                    yield _event("skip", "Already in database", level="warn", url=url, title=item.get("title") or "", city=city.label)
+                    continue
+                existing_urls.add(url)
+                documents.append(item)
+            queued.append((city, documents))
+            scanned_docs += len(documents)
 
-        for index, doc in enumerate(documents, start=1):
-            url = doc["url"]
-            title = doc.get("title") or url
-            text = pages.get(url, "")
-            doc["content"] = text[:char_limit]
+    yield _event(
+        "querit",
+        f"Finished Querit for {len(cities)} cities — {scanned_docs} pages to summarize",
+        cities=city_labels,
+        count=scanned_docs,
+    )
+
+    work: list[tuple[City, dict]] = [(city, doc) for city, documents in queued for doc in documents]
+    urls = [doc["url"] for _, doc in work]
+    yield _event(
+        "pages",
+        f"Fetching page text for {len(urls)} URLs in parallel",
+        count=len(urls),
+        char_limit=char_limit,
+        workers=fetch_workers,
+        crawl_timeout=crawl_timeout,
+    )
+    pages = querit.fetch_contents(urls, char_limit=char_limit)
+    yield _event("pages", f"Got text for {len(pages)}/{len(urls)} pages", fetched=len(pages), requested=len(urls))
+
+    for _, doc in work:
+        doc["content"] = pages.get(doc["url"], "")[:char_limit]
+
+    for item in _iter_llm_results(work, now, horizon):
+        if isinstance(item, dict):
+            yield item
+            continue
+        _kind, index, city, doc, extracted_events, reason = item
+        url = doc["url"]
+        title = doc.get("title") or url
+        yield _event(
+            "summarize",
+            f"[{index}/{len(work)}] LLM finished: {title}",
+            index=index,
+            total=len(work),
+            url=url,
+            title=title,
+            chars=len(doc.get("content") or ""),
+            city=city.label,
+        )
+        if not extracted_events:
+            skipped += 1
+            yield _event("skip", f"Not saved: {reason}", level="warn", url=url, title=title, reason=reason, city=city.label)
+            continue
+        for extracted in extracted_events:
+            summarized += 1
             yield _event(
                 "summarize",
-                f"[{index}/{len(documents)}] OpenRouter summarizing: {title}",
-                index=index,
-                total=len(documents),
-                url=url,
-                title=title,
-                chars=len(doc["content"]),
+                f"LLM accepted event: {extracted.title}",
+                title=extracted.title,
+                starts_at=extracted.starts_at,
+                tags=extracted.tags,
+                estimated_fields=list(extracted.estimated_fields),
+                url=extracted.source_url or url,
+                city=city.label,
             )
-            extracted_events, reason = llm.summarize_page(city, doc, now=now, horizon=horizon)
-            if not extracted_events:
-                skipped += 1
-                yield _event("skip", f"Not saved: {reason}", level="warn", url=url, title=title, reason=reason)
-                continue
-            for extracted in extracted_events:
-                summarized += 1
+            saved, persist_reason = _persist_extracted(
+                db, extracted, city, cities, now, horizon, existing_keys, existing_urls
+            )
+            if saved:
+                created += 1
+                pending_commits += 1
+                if pending_commits >= COMMIT_EVERY:
+                    db.commit()
+                    pending_commits = 0
                 yield _event(
-                    "summarize",
-                    f"LLM accepted event: {extracted.title}",
+                    "saved",
+                    f"Wrote to events DB: {extracted.title}",
                     title=extracted.title,
-                    starts_at=extracted.starts_at,
-                    tags=extracted.tags,
-                    estimated_fields=list(extracted.estimated_fields),
+                    city=city.label,
                     url=extracted.source_url or url,
                 )
-                saved, persist_reason = _persist_extracted(db, extracted, city, now, horizon, existing_keys, existing_urls)
-                if saved:
-                    created += 1
-                    yield _event(
-                        "saved",
-                        f"Wrote to events DB: {extracted.title}",
-                        title=extracted.title,
-                        city=extracted.city or city,
-                        url=extracted.source_url or url,
-                    )
-                else:
-                    skipped += 1
-                    yield _event(
-                        "skip",
-                        f"Not saved: {persist_reason}",
-                        level="warn",
-                        url=extracted.source_url or url,
-                        title=extracted.title,
-                        reason=persist_reason,
-                    )
+            else:
+                skipped += 1
+                yield _event(
+                    "skip",
+                    f"Not saved: {persist_reason}",
+                    level="warn",
+                    url=extracted.source_url or url,
+                    title=extracted.title,
+                    reason=persist_reason,
+                    city=city.label,
+                )
+
+    if pending_commits:
+        db.commit()
 
     yield _event(
         "done",
@@ -179,10 +215,40 @@ def iter_scan(db: Session, user: User | None = None) -> Iterator[dict]:
         scanned_docs=scanned_docs,
         summarized=summarized,
         skipped=skipped,
-        cities=cities,
+        cities=city_labels,
         result_count=result_count,
         page_char_limit=char_limit,
+        search_workers=search_workers,
+        fetch_workers=fetch_workers,
+        llm_concurrency=llm_concurrency,
+        crawl_timeout=crawl_timeout,
     )
+
+
+def _iter_llm_results(work: list[tuple[City, dict]], now: datetime, horizon: datetime):
+    if not work:
+        return
+    concurrency = min(settings.llm_concurrency(), len(work))
+    yield _event(
+        "summarize",
+        f"Summarizing {len(work)} pages with {settings.llm_model()} ({concurrency} at a time)",
+        count=len(work),
+        workers=concurrency,
+        model=settings.llm_model(),
+        provider=",".join(settings.llm_providers()) or "auto",
+    )
+
+    def summarize(item: tuple[int, City, dict]):
+        index, city, doc = item
+        extracted, reason = llm.summarize_page(city.label, doc, now=now, horizon=horizon)
+        return index, city, doc, extracted, reason
+
+    jobs = [(index, city, doc) for index, (city, doc) in enumerate(work, start=1)]
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        futures = [pool.submit(summarize, job) for job in jobs]
+        for future in as_completed(futures):
+            index, city, doc, extracted, reason = future.result()
+            yield ("result", index, city, doc, extracted, reason)
 
 
 def run_scan(db: Session, user: User | None = None) -> dict:
@@ -196,7 +262,8 @@ def run_scan(db: Session, user: User | None = None) -> dict:
 def _persist_extracted(
     db: Session,
     extracted: llm.ExtractedEvent,
-    fallback_city: str,
+    fallback_city: City,
+    cities: list[City],
     now: datetime,
     horizon: datetime,
     existing_keys: set,
@@ -206,7 +273,8 @@ def _persist_extracted(
     starts = _naive(extracted.starts_at)
     ends = _naive(extracted.ends_at)
     address = extracted.address.strip()
-    city = extracted.city.strip() or fallback_city
+    city_row = match_city(cities, extracted.city) if extracted.city.strip() else None
+    city_row = city_row or fallback_city
     source_url = extracted.source_url.strip() or None
     if not title or starts is None:
         return False, "missing title or unparseable starts_at"
@@ -220,12 +288,12 @@ def _persist_extracted(
         same = db.query(Event).filter(Event.source_url == source_url, Event.title == title[:200]).first()
         if same:
             return False, "duplicate source_url"
-    coords = geocode.geocode_place(address or title, city)
-    if coords is None:
-        coords = geocode.geocode_place(city, city)
-    if coords is None:
-        return False, "could not geocode address"
-    lat, lng = coords
+    hit = geocode.lookup_place(address, city_row.label, proximity=(city_row.lat, city_row.lng))
+    if hit is None:
+        lat, lng = city_row.lat, city_row.lng
+    else:
+        lat, lng = hit.lat, hit.lng
+        address = geocode.prefer_address(address, hit.address)
     key = _dedupe_key(title, starts, lat, lng)
     if key in existing_keys:
         return False, "duplicate title/date/location"
@@ -241,7 +309,8 @@ def _persist_extracted(
             lat=lat,
             lng=lng,
             address=address[:300],
-            city=city[:80],
+            city=city_row.name,
+            city_id=city_row.id,
             starts_at=starts,
             ends_at=ends,
             people_min=people_min,
@@ -253,7 +322,7 @@ def _persist_extracted(
             estimated_fields=dump_tags(list(extracted.estimated_fields)),
         )
     )
-    db.commit()
+    db.flush()
     return True, "ok"
 
 

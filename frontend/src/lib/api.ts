@@ -1,5 +1,5 @@
 import { clearToken, getToken } from "@/lib/auth";
-import type { EventItem, User } from "@/lib/types";
+import type { City, EventItem, User } from "@/lib/types";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "");
 
@@ -184,6 +184,7 @@ export const client = {
     }),
   me: () => api<User>("/me"),
   tags: () => api<{ tags: string[] }>("/tags"),
+  cities: () => api<{ cities: City[] }>("/cities"),
   onboard: (body: { name: string; phone?: string; tags: string[]; lat?: number; lng?: number }) =>
     api<User>("/me/onboarding", { method: "POST", body: JSON.stringify(body) }),
   patchMe: (body: Partial<User> & { default_radius_mi?: number }) =>

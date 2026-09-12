@@ -33,7 +33,7 @@ Rules:
 - If there is no end time, estimate ends_at a few hours after start and add "ends_at" to estimated_fields.
 - estimated_fields may only contain people_min, people_max, cost_estimate, or ends_at.
 - source_url should be a per-event URL when the page gives one; otherwise use the page URL.
-- address should be a venue or street if present; otherwise the neighborhood or city.
+- address must be the venue and street when the page has them (e.g. "Stage AE, 400 North Shore Dr"). Never use only the city name if a venue exists.
 """
 
 
@@ -148,6 +148,54 @@ def page_json_schema() -> dict:
     }
 
 
+def _headers() -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {settings.llm_api_key()}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "events.ai",
+    }
+
+
+def _page_user_payload(city: str, document: dict, now: datetime, horizon: datetime) -> dict:
+    return {
+        "city": city,
+        "today": now.date().isoformat(),
+        "window_start": now.isoformat(),
+        "window_end": horizon.isoformat(),
+        "allowed_tags": TAG_DICTIONARY,
+        "page": {
+            "title": document.get("title") or "",
+            "url": document.get("url") or "",
+            "snippet": document.get("snippet") or "",
+            "site_name": document.get("site_name") or "",
+            "text": document.get("content") or "",
+        },
+    }
+
+
+def page_chat_body(city: str, document: dict, now: datetime, horizon: datetime) -> dict:
+    body = {
+        "temperature": 0.3,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": json.dumps(_page_user_payload(city, document, now, horizon), ensure_ascii=False)},
+        ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "page_events",
+                "strict": True,
+                "schema": page_json_schema(),
+            },
+        },
+        "provider": settings.llm_provider_prefs(require_parameters=False),
+    }
+    if settings.llm_reasoning() != "none":
+        body["reasoning"] = {"effort": settings.llm_reasoning()}
+    return body
+
+
 def summarize_page(
     city: str,
     document: dict,
@@ -160,64 +208,24 @@ def summarize_page(
         return [], "no OpenRouter key"
     url = document.get("url") or ""
     title = document.get("title") or url
-    chars = len(document.get("content") or "")
     now = now or datetime.now(timezone.utc)
     horizon = horizon or (now + timedelta(days=21))
     log.info(
         "Summarizing %s (%s chars) city=%s model=%s provider=%s reasoning=%s",
         url,
-        chars,
+        len(document.get("content") or ""),
         city,
         settings.llm_model(),
         ",".join(settings.llm_providers()) or "auto",
         settings.llm_reasoning(),
     )
-    user_payload = {
-        "city": city,
-        "today": now.date().isoformat(),
-        "window_start": now.isoformat(),
-        "window_end": horizon.isoformat(),
-        "allowed_tags": TAG_DICTIONARY,
-        "page": {
-            "title": document.get("title") or "",
-            "url": url,
-            "snippet": document.get("snippet") or "",
-            "site_name": document.get("site_name") or "",
-            "text": document.get("content") or "",
-        },
-    }
-    body = {
-        "model": settings.llm_model(),
-        "temperature": 0.5,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
-        ],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "page_events",
-                "strict": True,
-                "schema": page_json_schema(),
-            },
-        },
-        "provider": settings.llm_provider_prefs(require_parameters=True),
-        "reasoning": {"effort": settings.llm_reasoning()},
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "events.ai",
-    }
+    body = page_chat_body(city, document, now, horizon)
+    body["model"] = settings.llm_model()
     endpoint = settings.llm_base_url() + "/chat/completions"
-    data = _post(endpoint, headers, body)
-    if data is None:
-        body["provider"] = settings.llm_provider_prefs(require_parameters=False)
-        data = _post(endpoint, headers, body)
+    data = _post(endpoint, _headers(), body)
     if data is None:
         body["response_format"] = {"type": "json_object"}
-        data = _post(endpoint, headers, body)
+        data = _post(endpoint, _headers(), body)
     if data is None:
         return [], "OpenRouter request failed"
     raw = _message_json(data)
@@ -269,7 +277,7 @@ def validate_event(raw: object, page_url: str = "", title: str = "") -> tuple[Ex
 
 def _post(url: str, headers: dict, body: dict) -> dict | None:
     try:
-        with httpx.Client(timeout=90) as client:
+        with httpx.Client(timeout=45) as client:
             res = client.post(url, headers=headers, json=body)
             if res.status_code >= 400:
                 log.warning("OpenRouter HTTP %s: %s", res.status_code, res.text[:400])

@@ -1,6 +1,11 @@
+import logging
+
 import httpx
 
 from app.config import settings
+
+log = logging.getLogger("events.carto")
+_geocode_disabled = False
 
 
 def _auth_header() -> str:
@@ -15,16 +20,21 @@ def _base_url() -> str:
 
 
 def geocode_address(address: str) -> tuple[float, float] | None:
-    if not settings.secret("carto_api_key"):
+    global _geocode_disabled
+    if _geocode_disabled or not settings.secret("carto_api_key"):
         return None
     try:
-        with httpx.Client(timeout=20) as client:
+        with httpx.Client(timeout=8) as client:
             res = client.get(
                 _base_url() + "/v3/lds/geocoding/geocode",
                 params={"address": address},
                 headers={"Authorization": _auth_header()},
             )
-            res.raise_for_status()
+            if res.status_code >= 400:
+                log.warning("Carto geocode HTTP %s — falling back to other geocoders", res.status_code)
+                if res.status_code in {401, 403}:
+                    _geocode_disabled = True
+                return None
             data = res.json()
     except httpx.HTTPError:
         return None

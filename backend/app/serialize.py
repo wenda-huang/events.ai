@@ -1,7 +1,8 @@
 import json
 
+from app.auth import is_admin
 from app.geo import haversine_mi
-from app.models import Event, User
+from app.models import City, Event, User
 
 
 def parse_tags(raw: str | None) -> list[str]:
@@ -29,6 +30,18 @@ def user_public(user: User) -> dict:
         "tags": parse_tags(user.tags),
         "onboarded": user.onboarded_at is not None,
         "default_radius_mi": user.default_radius_mi,
+        "is_admin": is_admin(user),
+    }
+
+
+def city_public(city: City) -> dict:
+    return {
+        "id": city.id,
+        "name": city.name,
+        "state": city.state,
+        "lat": city.lat,
+        "lng": city.lng,
+        "label": city.label,
     }
 
 
@@ -56,7 +69,7 @@ def event_public(
             "lat": event.lat,
             "lng": event.lng,
             "address": event.address,
-            "city": event.city,
+            "city": event.city_row.label if event.city_row is not None else event.city,
         },
         "starts_at": event.starts_at.isoformat(),
         "ends_at": event.ends_at.isoformat(),

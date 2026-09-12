@@ -1,19 +1,29 @@
 [database]
+# Hosted Postgres URL (required).
 url =
 
 [querit]
 api_key =
 page_char_limit = 4000
-result_count = 50
+result_count = 100
+crawl_timeout = 8
+contents_batch = 8
+fetch_concurrency = 10
+search_concurrency = 10
 
 [carto]
 api_base_url = https://gcp-us-east1.api.carto.com
 api_key =
 tile_url = https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
 
+[mapbox]
+# Secret token (sk.*) with search/geocoding scopes. Server-only — never send to the browser.
+api_key =
+
 [openrouter]
 api_key =
 base_url = https://openrouter.ai/api/v1
-model = openai/gpt-4o-mini
-provider = google-vertex/global
-reasoning = low
+model = inception/mercury-2.5
+provider = inception
+reasoning = none
+llm_concurrency = 8

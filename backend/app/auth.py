@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import User
 
 bearer = HTTPBearer(auto_error=False)
+ADMIN_EMAIL = "admin@admin.com"
 
 
 def hash_password(password: str) -> str:
@@ -47,4 +48,14 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
+
+
+def is_admin(user: User) -> bool:
+    return (user.email or "").strip().lower() == ADMIN_EMAIL
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     return user

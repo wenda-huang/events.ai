@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
+from app.cities import default_city, implemented_cities, match_city, nearest_city
 from app.database import get_db
 from app.geo import within_radius
-from app.models import Event, EventMembership, User
+from app.models import City, Event, EventMembership, User
 from app.schemas import EventCreate
 from app.serialize import dump_tags, event_public, parse_tags
 from app.services.search import MIN_SCORE, expand_query, score_event
@@ -35,7 +36,20 @@ def recommend_sort_key(event: dict) -> tuple:
 
 
 def _load_events(db: Session) -> list[Event]:
-    return db.query(Event).options(selectinload(Event.memberships)).all()
+    return db.query(Event).options(selectinload(Event.memberships), selectinload(Event.city_row)).all()
+
+
+def _resolve_city(db: Session, *, city_id: int | None, city_name: str, lat: float, lng: float) -> City | None:
+    if city_id is not None:
+        row = db.get(City, city_id)
+        if row is not None:
+            return row
+    cities = implemented_cities(db)
+    if city_name.strip():
+        matched = match_city(cities, city_name)
+        if matched is not None:
+            return matched
+    return nearest_city(cities, lat, lng) or default_city(db)
 
 
 def search_and_distance_origins(
@@ -129,7 +143,10 @@ def recommended_events(
 def my_events(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = (
         db.query(EventMembership)
-        .options(selectinload(EventMembership.event).selectinload(Event.memberships))
+        .options(
+            selectinload(EventMembership.event).selectinload(Event.memberships),
+            selectinload(EventMembership.event).selectinload(Event.city_row),
+        )
         .filter(EventMembership.user_id == user.id)
         .all()
     )
@@ -153,7 +170,12 @@ def get_event(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    event = db.query(Event).options(selectinload(Event.memberships)).filter(Event.id == event_id).first()
+    event = (
+        db.query(Event)
+        .options(selectinload(Event.memberships), selectinload(Event.city_row))
+        .filter(Event.id == event_id)
+        .first()
+    )
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     origin = (user.lat, user.lng) if user.lat is not None and user.lng is not None else None
@@ -172,13 +194,15 @@ def create_event(
         raise HTTPException(status_code=400, detail="Event end must be after start")
     if body.people_max < body.people_min:
         raise HTTPException(status_code=400, detail="people_max must be >= people_min")
+    city_row = _resolve_city(db, city_id=body.city_id, city_name=body.city, lat=body.lat, lng=body.lng)
     event = Event(
         title=body.title.strip(),
         description=body.description.strip(),
         lat=body.lat,
         lng=body.lng,
         address=body.address.strip(),
-        city=body.city.strip() or "Pittsburgh",
+        city=city_row.name if city_row else body.city.strip(),
+        city_id=city_row.id if city_row else None,
         starts_at=starts,
         ends_at=ends,
         people_min=body.people_min,
@@ -193,12 +217,22 @@ def create_event(
     db.add(EventMembership(event_id=event.id, user_id=user.id, status="joined", reason="Host"))
     db.commit()
     db.refresh(event)
-    event = db.query(Event).options(selectinload(Event.memberships)).filter(Event.id == event.id).first()
+    event = (
+        db.query(Event)
+        .options(selectinload(Event.memberships), selectinload(Event.city_row))
+        .filter(Event.id == event.id)
+        .first()
+    )
     return event_public(event, current_user_id=user.id)
 
 
 def _get_event(db: Session, event_id: int) -> Event:
-    event = db.query(Event).options(selectinload(Event.memberships)).filter(Event.id == event_id).first()
+    event = (
+        db.query(Event)
+        .options(selectinload(Event.memberships), selectinload(Event.city_row))
+        .filter(Event.id == event_id)
+        .first()
+    )
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     return event

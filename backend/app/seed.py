@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.cities import default_city
 from app.models import Event
 from app.serialize import dump_tags
 
@@ -180,6 +181,9 @@ PITTSBURGH_SEEDS = [
 def seed_if_empty(db: Session) -> None:
     if db.query(Event).count() > 0:
         return
+    city = default_city(db)
+    city_name = city.name if city else "Pittsburgh"
+    city_id = city.id if city else None
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     for item in PITTSBURGH_SEEDS:
         starts = (now + timedelta(days=item["offset_days"])).replace(
@@ -193,7 +197,8 @@ def seed_if_empty(db: Session) -> None:
                 lat=item["lat"],
                 lng=item["lng"],
                 address=item["address"],
-                city="Pittsburgh",
+                city=city_name,
+                city_id=city_id,
                 starts_at=starts,
                 ends_at=ends,
                 people_min=item["people_min"],

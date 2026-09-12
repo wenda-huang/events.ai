@@ -33,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_top,_#f2ddac,_#f6f1e6_55%)] px-4">
       <form onSubmit={onSubmit} className="w-full max-w-md rounded-3xl border border-line bg-panel p-8 shadow-lift">
-        <p className="text-[11px] uppercase tracking-[0.24em] text-gold">Pittsburgh</p>
+        <p className="text-[11px] uppercase tracking-[0.24em] text-gold">events.ai</p>
         <h1 className="mt-2 font-display text-4xl text-cream">Meet in the city.</h1>
         <p className="mt-2 text-sm text-mute">Sign in to see nearby events on the map.</p>
         <label className="mt-8 block text-xs uppercase tracking-wide text-mute">Email</label>

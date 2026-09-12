@@ -10,8 +10,8 @@ import { EventCover } from "@/components/EventCover";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
-import { defaultWindow, formatWhen, PITTSBURGH, queryParams, resolveOrigin, roundCoord, sameOrigin } from "@/lib/geo";
-import type { EventItem, Origin } from "@/lib/types";
+import { DEFAULT_ORIGIN, defaultCity, defaultWindow, formatWhen, queryParams, resolveOrigin, roundCoord, sameOrigin } from "@/lib/geo";
+import type { City, EventItem, Origin } from "@/lib/types";
 
 const SEARCH_DEBOUNCE_MS = 2000;
 const EVENTS_POLL_MS = 20000;
@@ -64,10 +64,11 @@ function SearchMatchRow({ event }: { event: EventItem }) {
 
 function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
-  const [origin, setOrigin] = useState<Origin>(PITTSBURGH);
-  const [mapFocus, setMapFocus] = useState<Origin>(PITTSBURGH);
+  const [origin, setOrigin] = useState<Origin>(DEFAULT_ORIGIN);
+  const [originCity, setOriginCity] = useState<City | undefined>();
+  const [mapFocus, setMapFocus] = useState<Origin>(DEFAULT_ORIGIN);
   const [focusNonce, setFocusNonce] = useState(0);
-  const [searchCenter, setSearchCenter] = useState<Origin>(PITTSBURGH);
+  const [searchCenter, setSearchCenter] = useState<Origin>(DEFAULT_ORIGIN);
   const [outsideCity, setOutsideCity] = useState(false);
   const [userLocation, setUserLocation] = useState<Origin | null>(null);
   const [radius, setRadius] = useState(3);
@@ -103,28 +104,53 @@ function MapView() {
   const showMatches = fetchedQ.trim().length > 0;
 
   useEffect(() => {
-    client.tags().then((res) => setAllTags(res.tags));
-    client.me().then((me) => {
-      if (me.default_radius_mi) setRadius(me.default_radius_mi);
+    let cancelled = false;
+    client.tags().then((res) => {
+      if (!cancelled) setAllTags(res.tags);
     });
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const resolved = resolveOrigin(coords);
-        setOrigin(resolved.origin);
-        setOutsideCity(resolved.outsideCity);
-        setUserLocation(coords);
-        setMapFocus(resolved.origin);
-        setSearchCenter(resolved.origin);
-        setFocusNonce((n) => n + 1);
-      },
-      () => {
-        setOrigin(PITTSBURGH);
-        setOutsideCity(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    client.me().then((me) => {
+      if (!cancelled && me.default_radius_mi) setRadius(me.default_radius_mi);
+    });
+    client.cities().then((res) => {
+      if (cancelled) return;
+      const list = res.cities;
+      const fallback = defaultCity(list);
+      const applyFallback = () => {
+        if (!fallback) return;
+        const coords = { lat: fallback.lat, lng: fallback.lng };
+        setOrigin(coords);
+        setOriginCity(fallback);
+        setMapFocus(coords);
+        setSearchCenter(coords);
+      };
+      if (!navigator.geolocation) {
+        applyFallback();
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const resolved = resolveOrigin(coords, list);
+          setOrigin(resolved.origin);
+          setOutsideCity(resolved.outsideCity);
+          setOriginCity(resolved.city);
+          setUserLocation(coords);
+          setMapFocus(resolved.origin);
+          setSearchCenter(resolved.origin);
+          setFocusNonce((n) => n + 1);
+        },
+        () => {
+          if (cancelled) return;
+          applyFallback();
+          setOutsideCity(false);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -328,9 +354,9 @@ function MapView() {
                   : showMatches
                     ? `${filteredEvents.length} match${filteredEvents.length === 1 ? "" : "es"}`
                     : outsideCity
-                      ? "Showing Pittsburgh (you’re outside the launch city)"
+                      ? `Showing ${originCity?.label ?? "the nearest city"} (you’re outside this city)`
                       : ""}
-                {!showSearchAnim && showMatches && outsideCity ? " · showing Pittsburgh" : ""}
+                {!showSearchAnim && showMatches && outsideCity ? ` · showing ${originCity?.label ?? "nearest city"}` : ""}
               </span>
               {error && <span className="text-rust">{error}</span>}
             </div>

@@ -14,8 +14,8 @@ const sans = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "events.ai — Pittsburgh meetups",
-  description: "Find people for nearby events in Pittsburgh.",
+  title: "events.ai — Local meetups",
+  description: "Find people for nearby events in your city.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

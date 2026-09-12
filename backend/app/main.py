@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, SessionLocal, engine, ensure_columns
 from app.routers import auth, events, jobs, users
+from app.cities import associate_events_to_default_city, implemented_cities, seed_cities
 from app.seed import seed_if_empty
 from app.services.cluster import run_cluster
 from app.services.scan import run_scan
@@ -36,6 +37,8 @@ async def lifespan(_: FastAPI):
     ensure_columns()
     db = SessionLocal()
     try:
+        seed_cities(db)
+        associate_events_to_default_city(db)
         seed_if_empty(db)
     finally:
         db.close()
@@ -67,7 +70,11 @@ app.include_router(jobs.router)
 
 @app.get("/health")
 def health():
-    return {"ok": True, "city": "Pittsburgh"}
+    db = SessionLocal()
+    try:
+        return {"ok": True, "cities": [city.label for city in implemented_cities(db)]}
+    finally:
+        db.close()
 
 
 @app.get("/config/public")

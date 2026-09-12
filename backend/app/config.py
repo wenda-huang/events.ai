@@ -26,17 +26,24 @@ def ini_values() -> dict[str, str]:
     if parser.has_section("querit"):
         values["querit_api_key"] = parser.get("querit", "api_key", fallback="").strip()
         values["page_char_limit"] = parser.get("querit", "page_char_limit", fallback="4000").strip()
-        values["result_count"] = parser.get("querit", "result_count", fallback="50").strip()
+        values["result_count"] = parser.get("querit", "result_count", fallback="100").strip()
+        values["crawl_timeout"] = parser.get("querit", "crawl_timeout", fallback="8").strip()
+        values["contents_batch"] = parser.get("querit", "contents_batch", fallback="8").strip()
+        values["fetch_concurrency"] = parser.get("querit", "fetch_concurrency", fallback="10").strip()
+        values["search_concurrency"] = parser.get("querit", "search_concurrency", fallback="10").strip()
     if parser.has_section("carto"):
         values["carto_api_key"] = parser.get("carto", "api_key", fallback="").strip()
         values["carto_api_base_url"] = parser.get("carto", "api_base_url", fallback="").strip()
         values["carto_tile_url"] = parser.get("carto", "tile_url", fallback="").strip()
+    if parser.has_section("mapbox"):
+        values["mapbox_api_key"] = parser.get("mapbox", "api_key", fallback="").strip()
     if parser.has_section("openrouter"):
         values["llm_api_key"] = parser.get("openrouter", "api_key", fallback="").strip()
         values["llm_base_url"] = parser.get("openrouter", "base_url", fallback="").strip()
         values["llm_model"] = parser.get("openrouter", "model", fallback="").strip()
         values["llm_provider"] = parser.get("openrouter", "provider", fallback="").strip()
         values["llm_reasoning"] = parser.get("openrouter", "reasoning", fallback="").strip()
+        values["llm_concurrency"] = parser.get("openrouter", "llm_concurrency", fallback="8").strip()
     elif parser.has_section("openai"):
         values["llm_api_key"] = parser.get("openai", "api_key", fallback="").strip()
         values["llm_base_url"] = parser.get("openai", "base_url", fallback="").strip()
@@ -65,6 +72,7 @@ class Settings(BaseSettings):
     carto_api_key: str = ""
     carto_api_base_url: str = _DEFAULT_CARTO_URL
     carto_tile_url: str = _DEFAULT_TILES
+    mapbox_api_key: str = ""
 
     def secret(self, name: str) -> str:
         current = str(getattr(self, name, "") or "").strip()
@@ -84,10 +92,10 @@ class Settings(BaseSettings):
         return (ini_values().get("llm_base_url") or "https://openrouter.ai/api/v1").rstrip("/")
 
     def llm_model(self) -> str:
-        return ini_values().get("llm_model") or "openai/gpt-4o-mini"
+        return ini_values().get("llm_model") or "inception/mercury-2.5"
 
     def llm_providers(self) -> list[str]:
-        raw = ini_values().get("llm_provider") or ""
+        raw = ini_values().get("llm_provider") or "inception"
         return [part.strip() for part in raw.replace(";", ",").split(",") if part.strip()]
 
     def llm_provider_prefs(self, *, require_parameters: bool) -> dict:
@@ -101,7 +109,7 @@ class Settings(BaseSettings):
 
     def llm_reasoning(self) -> str:
         allowed = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
-        raw = (ini_values().get("llm_reasoning") or "low").strip().lower()
+        raw = (ini_values().get("llm_reasoning") or "none").strip().lower()
         return raw if raw in allowed else "low"
 
     def page_char_limit(self) -> int:
@@ -111,10 +119,28 @@ class Settings(BaseSettings):
             return 4000
 
     def result_count(self) -> int:
+        return self._clamped_int("result_count", 100, 1, 100)
+
+    def crawl_timeout(self) -> int:
+        return self._clamped_int("crawl_timeout", 8, 3, 30)
+
+    def contents_batch(self) -> int:
+        return self._clamped_int("contents_batch", 8, 1, 20)
+
+    def fetch_concurrency(self) -> int:
+        return self._clamped_int("fetch_concurrency", 10, 1, 16)
+
+    def search_concurrency(self) -> int:
+        return self._clamped_int("search_concurrency", 10, 1, 10)
+
+    def llm_concurrency(self) -> int:
+        return self._clamped_int("llm_concurrency", 8, 1, 8)
+
+    def _clamped_int(self, key: str, default: int, lo: int, hi: int) -> int:
         try:
-            return max(1, min(100, int(ini_values().get("result_count") or 50)))
+            return max(lo, min(hi, int(ini_values().get(key) or default)))
         except ValueError:
-            return 50
+            return default
 
 
 settings = Settings()

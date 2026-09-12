@@ -42,7 +42,8 @@ class EventCreate(BaseModel):
     lat: float
     lng: float
     address: str = ""
-    city: str = "Pittsburgh"
+    city: str = ""
+    city_id: int | None = None
     starts_at: datetime
     ends_at: datetime
     people_min: int = Field(default=2, ge=1)

@@ -14,6 +14,7 @@ export function EventCard({ event }: { event: EventItem }) {
           {event.distance_mi != null && <span className="shrink-0 text-xs text-mute">{event.distance_mi} mi</span>}
         </div>
         <p className="mt-1 text-xs text-mute">{formatWhen(event.starts_at)}</p>
+        <p className="mt-1 truncate text-xs text-cream/70">{event.location.address || event.location.city}</p>
         <p className="mt-2 line-clamp-2 text-sm text-cream/80">{event.description}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {event.tags?.map((tag) => (

@@ -12,11 +12,15 @@ import { logApp, logScanEnd, logScanEvent, logScanStart } from "@/lib/devlog";
 function Settings() {
   const router = useRouter();
   const [radius, setRadius] = useState(3);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    client.me().then((me) => setRadius(me.default_radius_mi));
+    client.me().then((me) => {
+      setRadius(me.default_radius_mi);
+      setIsAdmin(Boolean(me.is_admin) || me.email.toLowerCase() === "admin@admin.com");
+    });
   }, []);
 
   async function saveRadius() {
@@ -79,13 +83,17 @@ function Settings() {
       </section>
       <section className="mt-6 rounded-2xl border border-line bg-card p-5">
         <h2 className="text-sm text-cream">AI jobs</h2>
-        <p className="mt-2 text-sm text-mute">
-          Scan Querit for the top 50 listings in your city, open those event pages, then summarize each one with OpenRouter. This can take a few minutes.
-        </p>
+        {isAdmin && (
+          <p className="mt-2 text-sm text-mute">
+            Parallel scan of the top 100 listings in every implemented city. Pages are summarized with inception/mercury-2.5 via Inception, then saved with that city.
+          </p>
+        )}
         <div className="mt-4 flex gap-3">
-          <button className="btn-gold" disabled={busy} onClick={() => run("scan")}>
-            Run scan
-          </button>
+          {isAdmin && (
+            <button className="btn-gold" disabled={busy} onClick={() => run("scan")}>
+              Run scan
+            </button>
+          )}
           <button className="btn-ghost" disabled={busy} onClick={() => run("cluster")}>
             Run cluster
           </button>

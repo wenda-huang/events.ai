@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
+from app.auth import get_current_user, require_admin
 from app.database import SessionLocal, get_db
 from app.models import User
 from app.services.cluster import run_cluster
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/scan")
-async def trigger_scan(request: Request, user: User = Depends(get_current_user)):
+async def trigger_scan(request: Request, user: User = Depends(require_admin)):
     user_id = user.id
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[dict | None] = asyncio.Queue()
