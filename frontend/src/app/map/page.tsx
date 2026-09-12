@@ -14,6 +14,7 @@ import { defaultWindow, formatWhen, PITTSBURGH, queryParams, resolveOrigin, roun
 import type { EventItem, Origin } from "@/lib/types";
 
 const SEARCH_DEBOUNCE_MS = 2000;
+const EVENTS_POLL_MS = 20000;
 
 const EventMap = dynamic(() => import("@/components/EventMap"), { ssr: false });
 
@@ -137,39 +138,55 @@ function MapView() {
   useEffect(() => {
     const params = queryParams(searchCenter, radius, start, end, debouncedQ, distanceFrom);
     let cancelled = false;
-    setError("");
-    setEventsLoading(true);
-    client
-      .events(params)
-      .then((list) => {
-        if (cancelled) return;
-        setEvents(list.events);
-        setFetchedQ(debouncedQ);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load events");
-      })
-      .finally(() => {
-        if (!cancelled) setEventsLoading(false);
-      });
+
+    function load(background: boolean) {
+      if (!background) {
+        setError("");
+        setEventsLoading(true);
+      }
+      client
+        .events(params)
+        .then((list) => {
+          if (cancelled) return;
+          setEvents(list.events);
+          setFetchedQ(debouncedQ);
+        })
+        .catch((err) => {
+          if (!cancelled && !background) setError(err instanceof Error ? err.message : "Could not load events");
+        })
+        .finally(() => {
+          if (!cancelled && !background) setEventsLoading(false);
+        });
+    }
+
+    load(false);
+    const interval = setInterval(() => load(true), EVENTS_POLL_MS);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [searchCenter, radius, start, end, debouncedQ, distanceFrom.lat, distanceFrom.lng]);
 
   useEffect(() => {
     const params = queryParams(searchCenter, radius, start, end, "", distanceFrom);
     let cancelled = false;
-    client
-      .recommended(params)
-      .then((rec) => {
-        if (!cancelled) setRecommended(rec.events);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load events");
-      });
+
+    function load() {
+      client
+        .recommended(params)
+        .then((rec) => {
+          if (!cancelled) setRecommended(rec.events);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err.message : "Could not load events");
+        });
+    }
+
+    load();
+    const interval = setInterval(load, EVENTS_POLL_MS);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [searchCenter, radius, start, end, distanceFrom.lat, distanceFrom.lng]);
 
