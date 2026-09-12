@@ -41,6 +41,8 @@ def ini_values() -> dict[str, str]:
         values["llm_api_key"] = parser.get("openai", "api_key", fallback="").strip()
         values["llm_base_url"] = parser.get("openai", "base_url", fallback="").strip()
         values["llm_model"] = parser.get("openai", "model", fallback="").strip()
+    if parser.has_section("database"):
+        values["database_url"] = parser.get("database", "url", fallback="").strip()
     return {key: value for key, value in values.items() if value}
 
 
@@ -52,7 +54,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = "sqlite:///./events.db"
+    database_url: str = ""
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7

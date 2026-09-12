@@ -11,6 +11,8 @@ import { client } from "@/lib/api";
 import { formatWhen } from "@/lib/geo";
 import type { EventItem } from "@/lib/types";
 
+const EVENT_POLL_MS = 20000;
+
 function EventDetail() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
@@ -19,7 +21,25 @@ function EventDetail() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    client.event(id).then(setEvent).catch((err) => setError(err instanceof Error ? err.message : "Not found"));
+    let cancelled = false;
+
+    function load(background: boolean) {
+      client
+        .event(id)
+        .then((data) => {
+          if (!cancelled) setEvent(data);
+        })
+        .catch((err) => {
+          if (!cancelled && !background) setError(err instanceof Error ? err.message : "Not found");
+        });
+    }
+
+    load(false);
+    const interval = setInterval(() => load(true), EVENT_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [id]);
 
   async function join() {

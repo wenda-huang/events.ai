@@ -1,3 +1,6 @@
+[database]
+url =
+
 [querit]
 api_key =
 page_char_limit = 4000
