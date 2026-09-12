@@ -228,21 +228,26 @@ function ClusteredMarkers({ events }: { events: EventItem[] }) {
   );
 }
 
-function Recenter({ origin }: { origin: Origin }) {
+function Recenter({ origin, nonce = 0 }: { origin: Origin; nonce?: number }) {
   const map = useMap();
   useEffect(() => {
     map.setView([origin.lat, origin.lng], map.getZoom());
-  }, [map, origin.lat, origin.lng]);
+  }, [map, origin.lat, origin.lng, nonce]);
   return null;
 }
 
 function MapGestures({
   onPick,
   onMapInteract,
+  onViewIdle,
 }: {
   onPick?: (origin: Origin) => void;
   onMapInteract?: () => void;
+  onViewIdle?: (center: Origin) => void;
 }) {
+  const idleTimer = useRef<number | null>(null);
+  const map = useMap();
+
   useMapEvents({
     click(e) {
       onMapInteract?.();
@@ -250,8 +255,26 @@ function MapGestures({
     },
     dragstart() {
       onMapInteract?.();
+      if (idleTimer.current) window.clearTimeout(idleTimer.current);
+    },
+    zoomstart() {
+      onMapInteract?.();
+      if (idleTimer.current) window.clearTimeout(idleTimer.current);
+    },
+    moveend() {
+      if (!onViewIdle) return;
+      if (idleTimer.current) window.clearTimeout(idleTimer.current);
+      idleTimer.current = window.setTimeout(() => {
+        const center = map.getCenter();
+        onViewIdle({ lat: center.lat, lng: center.lng });
+      }, 280);
     },
   });
+  useEffect(() => {
+    return () => {
+      if (idleTimer.current) window.clearTimeout(idleTimer.current);
+    };
+  }, []);
   return null;
 }
 
@@ -261,11 +284,25 @@ type Props = {
   pick?: Origin | null;
   onPick?: (origin: Origin) => void;
   onMapInteract?: () => void;
+  onViewIdle?: (center: Origin) => void;
+  onUserLocationClick?: () => void;
+  focusNonce?: number;
   zoom?: number;
   userLocation?: Origin | null;
 };
 
-export default function EventMap({ origin, events = [], pick, onPick, onMapInteract, zoom = 13, userLocation }: Props) {
+export default function EventMap({
+  origin,
+  events = [],
+  pick,
+  onPick,
+  onMapInteract,
+  onViewIdle,
+  onUserLocationClick,
+  focusNonce = 0,
+  zoom = 13,
+  userLocation,
+}: Props) {
   const center = pick ?? origin;
   const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
 
@@ -289,15 +326,20 @@ export default function EventMap({ origin, events = [], pick, onPick, onMapInter
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
         url={tileUrl}
       />
-      <Recenter origin={center} />
-      <MapGestures onPick={onPick} onMapInteract={onMapInteract} />
+      <Recenter origin={center} nonce={focusNonce} />
+      <MapGestures onPick={onPick} onMapInteract={onMapInteract} onViewIdle={onViewIdle} />
       <ClusteredMarkers events={events} />
       {userLocation && (
         <Marker
           position={[userLocation.lat, userLocation.lng]}
           icon={getUserDotIcon()}
-          interactive={false}
-          zIndexOffset={-100}
+          zIndexOffset={400}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stop(e.originalEvent);
+              onUserLocationClick?.();
+            },
+          }}
         />
       )}
       {pick && (
