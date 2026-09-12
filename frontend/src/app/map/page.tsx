@@ -85,7 +85,6 @@ function MapView() {
   const mapAreaRef = useRef<HTMLDivElement>(null);
   const recommendedListRef = useRef<HTMLDivElement>(null);
   const recHeaderRef = useRef<HTMLDivElement>(null);
-  const firstCardRef = useRef<HTMLDivElement>(null);
   const searchOverlayRef = useRef<HTMLDivElement>(null);
   const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
   const [panelHeight, setPanelHeight] = useState<number>();
@@ -229,14 +228,12 @@ function MapView() {
   useLayoutEffect(() => {
     const mapHeight = mapAreaRef.current?.clientHeight ?? 0;
     const headerHeight = recHeaderRef.current?.getBoundingClientRect().height ?? 0;
-    const cardHeight = firstCardRef.current?.getBoundingClientRect().height ?? 0;
     const outerPad = 32;
     const innerPad = 24;
-    const headerGap = 8;
-    const collapsedHeight = Math.ceil(outerPad + innerPad + headerHeight + headerGap + cardHeight);
+    const collapsedHeight = Math.ceil(outerPad + innerPad + headerHeight);
     const expandedHeight = Math.max(collapsedHeight, mapHeight - searchOverlayHeight);
     setPanelHeight(recommendedExpanded ? expandedHeight : collapsedHeight);
-  }, [recommendedExpanded, searchOverlayHeight, filteredRecommended]);
+  }, [recommendedExpanded, searchOverlayHeight]);
 
   return (
     <div ref={mapAreaRef} className="relative min-h-0 flex-1">
@@ -397,15 +394,11 @@ function MapView() {
               ref={recommendedListRef}
               className={`min-h-0 flex-1 space-y-2 ${recommendedExpanded ? "overflow-auto" : "overflow-hidden"}`}
             >
-              {filteredRecommended.map((event, index) => (
-                <div key={event.id} ref={index === 0 ? firstCardRef : undefined}>
-                  <EventCard event={event} />
-                </div>
+              {filteredRecommended.map((event) => (
+                <EventCard key={event.id} event={event} />
               ))}
               {filteredRecommended.length === 0 && (
-                <p ref={firstCardRef} className="px-1 py-6 text-center text-sm text-mute">
-                  No recommendations match these filters.
-                </p>
+                <p className="px-1 py-6 text-center text-sm text-mute">No recommendations match these filters.</p>
               )}
             </div>
           </div>
