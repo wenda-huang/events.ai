@@ -242,6 +242,7 @@ function MapView() {
                 step={0.5}
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
+                style={{ ["--range-progress" as string]: `${((radius - 1) / 14) * 100}%` }}
               />
               <span className="w-10 text-cream">{radius} mi</span>
             </label>
