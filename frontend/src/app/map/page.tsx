@@ -30,6 +30,9 @@ function matchesFilterTags(event: EventItem, tags: string[]) {
   return (event.tags || []).some((tag) => tags.includes(tag));
 }
 
+const DEFAULT_MAP_EVENT_LIMIT = 25;
+const MAX_MAP_EVENT_LIMIT = 100;
+
 function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
   const [origin, setOrigin] = useState<Origin>(PITTSBURGH);
@@ -40,6 +43,7 @@ function MapView() {
   const [q, setQ] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [mapEventLimit, setMapEventLimit] = useState(DEFAULT_MAP_EVENT_LIMIT);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [recommendedExpanded, setRecommendedExpanded] = useState(false);
   const mapAreaRef = useRef<HTMLDivElement>(null);
@@ -52,14 +56,19 @@ function MapView() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
   const [error, setError] = useState("");
-  const filteredEvents = useMemo(
+  const taggedEvents = useMemo(
     () => events.filter((event) => matchesFilterTags(event, filterTags)),
     [events, filterTags]
+  );
+  const mapEvents = useMemo(
+    () => taggedEvents.slice(0, mapEventLimit),
+    [taggedEvents, mapEventLimit]
   );
   const filteredRecommended = useMemo(
     () => recommended.filter((event) => matchesFilterTags(event, filterTags)),
     [recommended, filterTags]
   );
+  const filtersActive = filterTags.length > 0 || mapEventLimit !== DEFAULT_MAP_EVENT_LIMIT;
 
   useEffect(() => {
     client.tags().then((res) => setAllTags(res.tags));
@@ -123,7 +132,7 @@ function MapView() {
 
   return (
     <div ref={mapAreaRef} className="relative min-h-0 flex-1">
-      <EventMap origin={origin} events={filteredEvents} onMapInteract={() => setRecommendedExpanded(false)} />
+      <EventMap origin={origin} events={mapEvents} onMapInteract={() => setRecommendedExpanded(false)} />
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
@@ -149,12 +158,16 @@ function MapView() {
               type="button"
               onClick={() => setShowFilters((v) => !v)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs transition hover:border-gold/60 hover:text-cream ${
-                showFilters || filterTags.length > 0 ? "border-gold/60 text-cream" : "border-line text-mute"
+                showFilters || filtersActive ? "border-gold/60 text-cream" : "border-line text-mute"
               }`}
               aria-expanded={showFilters}
             >
               Filter
-              {filterTags.length > 0 && <span className="rounded-full bg-gold/20 px-1.5 text-[10px] text-gold">{filterTags.length}</span>}
+              {filtersActive && (
+                <span className="rounded-full bg-gold/20 px-1.5 text-[10px] text-gold">
+                  {filterTags.length + (mapEventLimit !== DEFAULT_MAP_EVENT_LIMIT ? 1 : 0)}
+                </span>
+              )}
               <Chevron open={showFilters} />
             </button>
           </div>
@@ -176,6 +189,20 @@ function MapView() {
                     <input className="field w-auto" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
                   </label>
                 </div>
+                <label className="flex min-w-56 flex-1 items-center gap-2 text-xs text-mute">
+                  Events on map
+                  <input
+                    type="range"
+                    min={1}
+                    max={MAX_MAP_EVENT_LIMIT}
+                    step={1}
+                    value={mapEventLimit}
+                    onChange={(e) => setMapEventLimit(Number(e.target.value))}
+                    className="min-w-32 flex-1"
+                    aria-label="Number of events shown on the map"
+                  />
+                  <span className="w-10 text-cream">{mapEventLimit}</span>
+                </label>
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Tags</p>
@@ -192,7 +219,8 @@ function MapView() {
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-mute">
             <span>
-              {filteredEvents.length} events
+              {mapEvents.length}
+              {mapEvents.length < taggedEvents.length ? ` of ${taggedEvents.length}` : ""} events
               {filterTags.length > 0 ? " filtered" : ""} · default window is 2 weeks
               {outsideCity ? " · showing Pittsburgh (you’re outside the launch city)" : ""}
             </span>
