@@ -5,3 +5,8 @@ api_key =
 api_base_url = https://gcp-us-east1.api.carto.com
 api_key =
 tile_url = https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
+
+[openai]
+api_key =
+base_url = https://api.openai.com/v1
+model = gpt-4o-mini

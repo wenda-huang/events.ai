@@ -28,10 +28,10 @@ def _dedupe_key(title: str, starts: datetime, lat: float, lng: float) -> tuple:
 
 
 def run_scan(db: Session) -> dict:
-    if not settings.querit_api_key:
+    if not settings.secret("querit_api_key"):
         return {"ok": False, "reason": "QUERIT_API_KEY missing", "created": 0}
-    if not settings.openai_api_key:
-        return {"ok": False, "reason": "OPENAI_API_KEY missing", "created": 0}
+    if not settings.secret("openai_api_key"):
+        return {"ok": False, "reason": "OPENAI_API_KEY missing — add it under [openai] in config.ini", "created": 0}
 
     seen_urls = {e.source_url for e in db.query(Event).filter(Event.source_url.isnot(None)).all()}
     existing_keys = {

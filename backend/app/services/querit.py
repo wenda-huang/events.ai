@@ -18,10 +18,10 @@ def scan_queries() -> list[str]:
 
 
 def search(query: str, count: int = 8) -> list[dict]:
-    if not settings.querit_api_key:
+    if not settings.secret("querit_api_key"):
         return []
     headers = {
-        "Authorization": f"Bearer {settings.querit_api_key}",
+        "Authorization": f"Bearer {settings.secret('querit_api_key')}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
@@ -59,10 +59,11 @@ def search(query: str, count: int = 8) -> list[dict]:
 
 
 def fetch_contents(urls: list[str]) -> dict[str, str]:
-    if not settings.querit_api_key or not urls:
+    key = settings.secret("querit_api_key")
+    if not key or not urls:
         return {}
     headers = {
-        "Authorization": f"Bearer {settings.querit_api_key}",
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }

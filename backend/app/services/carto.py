@@ -4,16 +4,16 @@ from app.config import settings
 
 
 def _auth_header() -> str:
-    token = settings.carto_api_key.strip()
+    token = settings.secret("carto_api_key")
     if token.lower().startswith("bearer "):
         return token
     return f"Bearer {token}"
 
 
 def geocode_address(address: str) -> tuple[float, float] | None:
-    if not settings.carto_api_key:
+    if not settings.secret("carto_api_key"):
         return None
-    url = settings.carto_api_base_url.rstrip("/") + "/v3/lds/geocoding/geocode"
+    url = settings.secret("carto_api_base_url").rstrip("/") + "/v3/lds/geocoding/geocode"
     try:
         with httpx.Client(timeout=20) as client:
             res = client.get(
