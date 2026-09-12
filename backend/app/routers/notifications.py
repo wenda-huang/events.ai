@@ -4,13 +4,14 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Notification, User
-from app.services.notifications import mark_read, notification_public
+from app.services.notifications import backfill_pending_invites, mark_read, notification_public
 
 router = APIRouter(tags=["notifications"])
 
 
 @router.get("/notifications")
 def list_notifications(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    backfill_pending_invites(db, user)
     rows = (
         db.query(Notification)
         .filter(Notification.user_id == user.id)
@@ -26,7 +27,7 @@ def list_notifications(user: User = Depends(get_current_user), db: Session = Dep
     return {
         "notifications": [notification_public(row) for row in rows],
         "unread_count": unread_count,
-        "enabled": bool(getattr(user, "notifications_enabled", True)),
+        "enabled": getattr(user, "notifications_enabled", True) is not False,
     }
 
 

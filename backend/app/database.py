@@ -49,6 +49,9 @@ def ensure_columns() -> None:
                 _exec_ignore_duplicate(
                     conn, "ALTER TABLE users ADD COLUMN notifications_enabled BOOLEAN DEFAULT TRUE"
                 )
+            _exec_ignore_duplicate(
+                conn, "UPDATE users SET notifications_enabled = TRUE WHERE notifications_enabled IS NULL"
+            )
 
 
 def get_db():

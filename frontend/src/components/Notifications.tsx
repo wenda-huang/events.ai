@@ -37,6 +37,13 @@ function relativeTime(iso: string | null) {
   return `${days}d ago`;
 }
 
+function isFresh(iso: string | null) {
+  if (!iso) return true;
+  const then = new Date(iso.endsWith("Z") ? iso : `${iso}Z`).getTime();
+  if (Number.isNaN(then)) return true;
+  return Date.now() - then < 10 * 60 * 1000;
+}
+
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,18 +55,22 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const seenIds = useRef<Set<number>>(new Set());
   const primed = useRef(false);
 
-  const ingest = useCallback((next: AppNotification[], unread: number, live: boolean) => {
+    const ingest = useCallback((next: AppNotification[], unread: number, live: boolean) => {
     setItems(next);
     setUnreadCount(unread);
     setEnabled(live);
-    const fresh = next.filter((item) => !seenIds.current.has(item.id));
+    const unseen = next.filter((item) => !seenIds.current.has(item.id));
     for (const item of next) seenIds.current.add(item.id);
+    const toastable = unseen.filter((item) => !item.read && live && isFresh(item.created_at));
     if (!primed.current) {
       primed.current = true;
+      if (toastable.length > 0) setToasts((current) => [...toastable, ...current].slice(0, 4));
       return;
     }
-    if (!live || fresh.length === 0) return;
-    setToasts((current) => [...fresh, ...current].slice(0, 4));
+    if (unseen.length === 0) return;
+    const liveToasts = live ? unseen.filter((item) => !item.read) : [];
+    if (liveToasts.length === 0) return;
+    setToasts((current) => [...liveToasts, ...current].slice(0, 4));
   }, []);
 
   const load = useCallback(async () => {

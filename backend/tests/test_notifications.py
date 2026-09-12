@@ -36,5 +36,6 @@ class NotificationCopyTests(unittest.TestCase):
 
     def test_toggle_skips_disabled_recipients(self):
         self.assertTrue(recipient_allows_notifications(type("U", (), {"notifications_enabled": True})()))
+        self.assertTrue(recipient_allows_notifications(type("U", (), {"notifications_enabled": None})()))
         self.assertFalse(recipient_allows_notifications(type("U", (), {"notifications_enabled": False})()))
         self.assertFalse(recipient_allows_notifications(None))
