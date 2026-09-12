@@ -5,6 +5,9 @@ DEFAULT_LAT = 40.4406
 DEFAULT_LNG = -79.9959
 PITTSBURGH_LAT = DEFAULT_LAT
 PITTSBURGH_LNG = DEFAULT_LNG
+# Antipode distance is ~12,450 mi; this covers the planet and skips the radius filter.
+UNLIMITED_RADIUS_MI = 12_500
+MAX_RADIUS_MI = UNLIMITED_RADIUS_MI
 
 
 def haversine_mi(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -21,4 +24,6 @@ def within_radius(
     lng: float,
     radius_mi: float,
 ) -> bool:
+    if radius_mi >= UNLIMITED_RADIUS_MI:
+        return True
     return haversine_mi(origin_lat, origin_lng, lat, lng) <= radius_mi
