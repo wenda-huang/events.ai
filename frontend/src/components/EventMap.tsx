@@ -236,10 +236,20 @@ function Recenter({ origin }: { origin: Origin }) {
   return null;
 }
 
-function ClickCapture({ onPick }: { onPick?: (origin: Origin) => void }) {
+function MapGestures({
+  onPick,
+  onMapInteract,
+}: {
+  onPick?: (origin: Origin) => void;
+  onMapInteract?: () => void;
+}) {
   useMapEvents({
     click(e) {
+      onMapInteract?.();
       onPick?.({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+    dragstart() {
+      onMapInteract?.();
     },
   });
   return null;
@@ -250,11 +260,12 @@ type Props = {
   events?: EventItem[];
   pick?: Origin | null;
   onPick?: (origin: Origin) => void;
+  onMapInteract?: () => void;
   zoom?: number;
   userLocation?: Origin | null;
 };
 
-export default function EventMap({ origin, events = [], pick, onPick, zoom = 13, userLocation }: Props) {
+export default function EventMap({ origin, events = [], pick, onPick, onMapInteract, zoom = 13, userLocation }: Props) {
   const center = pick ?? origin;
   const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
 
@@ -279,7 +290,7 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13,
         url={tileUrl}
       />
       <Recenter origin={center} />
-      <ClickCapture onPick={onPick} />
+      <MapGestures onPick={onPick} onMapInteract={onMapInteract} />
       <ClusteredMarkers events={events} />
       {userLocation && (
         <Marker

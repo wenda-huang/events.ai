@@ -1,16 +1,34 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { EventCard } from "@/components/EventCard";
 import { RequireAuth } from "@/components/RequireAuth";
+import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
 import { defaultWindow, PITTSBURGH, queryParams, resolveOrigin } from "@/lib/geo";
 import type { EventItem, Origin } from "@/lib/types";
 
 const EventMap = dynamic(() => import("@/components/EventMap"), { ssr: false });
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+    >
+      <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function matchesFilterTags(event: EventItem, tags: string[]) {
+  if (tags.length === 0) return true;
+  return (event.tags || []).some((tag) => tags.includes(tag));
+}
 
 function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
@@ -21,14 +39,31 @@ function MapView() {
   const [start, setStart] = useState(windowDefaults.start);
   const [end, setEnd] = useState(windowDefaults.end);
   const [q, setQ] = useState("");
-  const [showDateFilters, setShowDateFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [recommendedExpanded, setRecommendedExpanded] = useState(false);
+  const mapAreaRef = useRef<HTMLDivElement>(null);
   const recommendedListRef = useRef<HTMLDivElement>(null);
+  const recHeaderRef = useRef<HTMLDivElement>(null);
+  const firstCardRef = useRef<HTMLDivElement>(null);
+  const searchOverlayRef = useRef<HTMLDivElement>(null);
+  const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
+  const [panelHeight, setPanelHeight] = useState<number>();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
   const [error, setError] = useState("");
+  const filteredEvents = useMemo(
+    () => events.filter((event) => matchesFilterTags(event, filterTags)),
+    [events, filterTags]
+  );
+  const filteredRecommended = useMemo(
+    () => recommended.filter((event) => matchesFilterTags(event, filterTags)),
+    [recommended, filterTags]
+  );
 
   useEffect(() => {
+    client.tags().then((res) => setAllTags(res.tags));
     client.me().then((me) => {
       if (me.default_radius_mi) setRadius(me.default_radius_mi);
     });
@@ -67,10 +102,37 @@ function MapView() {
     };
   }, [origin, radius, start, end, q]);
 
+  useEffect(() => {
+    const el = searchOverlayRef.current;
+    if (!el) return;
+    const update = () => setSearchOverlayHeight(el.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const mapHeight = mapAreaRef.current?.clientHeight ?? 0;
+    const headerHeight = recHeaderRef.current?.getBoundingClientRect().height ?? 0;
+    const cardHeight = firstCardRef.current?.getBoundingClientRect().height ?? 0;
+    const outerPad = 32;
+    const innerPad = 24;
+    const headerGap = 8;
+    const collapsedHeight = Math.ceil(outerPad + innerPad + headerHeight + headerGap + cardHeight);
+    const expandedHeight = Math.max(collapsedHeight, mapHeight - searchOverlayHeight);
+    setPanelHeight(recommendedExpanded ? expandedHeight : collapsedHeight);
+  }, [recommendedExpanded, searchOverlayHeight, filteredRecommended]);
+
   return (
-    <div className="relative min-h-0 flex-1">
-      <EventMap origin={origin} events={events} userLocation={userLocation} />
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] p-4">
+    <div ref={mapAreaRef} className="relative min-h-0 flex-1">
+      <EventMap
+        origin={origin}
+        events={filteredEvents}
+        userLocation={userLocation}
+        onMapInteract={() => setRecommendedExpanded(false)}
+      />
+      <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -93,39 +155,57 @@ function MapView() {
             </label>
             <button
               type="button"
-              onClick={() => setShowDateFilters((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-line px-3 py-2 text-xs text-mute transition hover:border-gold/60 hover:text-cream"
-              aria-expanded={showDateFilters}
+              onClick={() => setShowFilters((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs transition hover:border-gold/60 hover:text-cream ${
+                showFilters || filterTags.length > 0 ? "border-gold/60 text-cream" : "border-line text-mute"
+              }`}
+              aria-expanded={showFilters}
             >
-              Dates
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                className={`h-3.5 w-3.5 transition-transform ${showDateFilters ? "rotate-180" : ""}`}
-              >
-                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              Filter
+              {filterTags.length > 0 && (
+                <span className="rounded-full bg-gold/20 px-1.5 text-[10px] text-gold">{filterTags.length}</span>
+              )}
+              <Chevron open={showFilters} />
             </button>
           </div>
-          {showDateFilters && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
-              <label className="flex items-center gap-2 text-xs text-mute">
-                From
-                <input className="field w-auto" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-mute">
-                To
-                <input className="field w-auto" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
-              </label>
+          <div
+            className="grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            style={{ gridTemplateRows: showFilters ? "1fr" : "0fr" }}
+            aria-hidden={!showFilters}
+            inert={!showFilters}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="mt-2 space-y-3 border-t border-line pt-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs text-mute">
+                    From
+                    <input className="field w-auto" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-mute">
+                    To
+                    <input className="field w-auto" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+                  </label>
+                </div>
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Tags</p>
+                    {filterTags.length > 0 && (
+                      <button type="button" className="text-[11px] text-gold" onClick={() => setFilterTags([])}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <TagPicker tags={allTags} selected={filterTags} onChange={setFilterTags} />
+                </div>
+              </div>
+            </div>
+          </div>
+          {(error || outsideCity) && (
+            <div className="mt-2 flex items-center justify-between text-xs text-mute">
+              {outsideCity ? <span>Showing Pittsburgh (you’re outside the launch city)</span> : <span />}
+              {error && <span className="text-rust">{error}</span>}
             </div>
           )}
-          <div className="mt-2 flex items-center justify-between text-xs text-mute">
-            <span>
-              {events.length} events · default window is 2 weeks
-              {outsideCity ? " · showing Pittsburgh (you’re outside the launch city)" : ""}
-            </span>
-            {error && <span className="text-rust">{error}</span>}
-          </div>
         </div>
       </div>
       {recommended.length > 0 && (
@@ -137,32 +217,41 @@ function MapView() {
               setRecommendedExpanded(false);
             }
           }}
-          className={`absolute bottom-0 right-0 z-[500] flex w-[600px] max-w-[92vw] flex-col p-4 transition-[max-height] duration-300 ease-out ${
-            recommendedExpanded ? "max-h-[90vh]" : "max-h-[22vh]"
-          }`}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col overflow-hidden p-4 transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={panelHeight ? { height: panelHeight } : undefined}
         >
-          <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
-            <div className="mb-2 flex shrink-0 items-center justify-between">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-gold">Recommended</p>
+          <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
+            <div ref={recHeaderRef} className="mb-2 flex shrink-0 items-center justify-between">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-gold">
+                Recommended
+                <span className="ml-2 tracking-normal text-mute">
+                  {filteredRecommended.length}
+                  {filterTags.length > 0 ? " filtered" : ""}
+                </span>
+              </p>
               <button
                 type="button"
                 onClick={() => setRecommendedExpanded((v) => !v)}
                 className="flex items-center gap-1 text-xs text-mute transition hover:text-cream"
               >
                 {recommendedExpanded ? "Collapse" : "Expand"}
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  className={`h-3.5 w-3.5 transition-transform ${recommendedExpanded ? "rotate-180" : ""}`}
-                >
-                  <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <Chevron open={recommendedExpanded} />
               </button>
             </div>
-            <div ref={recommendedListRef} className="min-h-0 flex-1 space-y-2 overflow-auto">
-              {recommended.slice(0, recommendedExpanded ? recommended.length : 4).map((event) => (
-                <EventCard key={event.id} event={event} />
+            <div
+              ref={recommendedListRef}
+              className={`min-h-0 flex-1 space-y-2 ${recommendedExpanded ? "overflow-auto" : "overflow-hidden"}`}
+            >
+              {filteredRecommended.map((event, index) => (
+                <div key={event.id} ref={index === 0 ? firstCardRef : undefined}>
+                  <EventCard event={event} />
+                </div>
               ))}
+              {filteredRecommended.length === 0 && (
+                <p ref={firstCardRef} className="px-1 py-6 text-center text-sm text-mute">
+                  No recommendations match these filters.
+                </p>
+              )}
             </div>
           </div>
         </div>
