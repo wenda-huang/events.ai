@@ -28,17 +28,20 @@ function Recenter({ origin }: { origin: Origin }) {
   return null;
 }
 
-function ClickCapture({
+function MapGestures({
   onPick,
-  onMapClick,
+  onMapInteract,
 }: {
   onPick?: (origin: Origin) => void;
-  onMapClick?: () => void;
+  onMapInteract?: () => void;
 }) {
   useMapEvents({
     click(e) {
-      onMapClick?.();
+      onMapInteract?.();
       onPick?.({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+    dragstart() {
+      onMapInteract?.();
     },
   });
   return null;
@@ -49,11 +52,11 @@ type Props = {
   events?: EventItem[];
   pick?: Origin | null;
   onPick?: (origin: Origin) => void;
-  onMapClick?: () => void;
+  onMapInteract?: () => void;
   zoom?: number;
 };
 
-export default function EventMap({ origin, events = [], pick, onPick, onMapClick, zoom = 13 }: Props) {
+export default function EventMap({ origin, events = [], pick, onPick, onMapInteract, zoom = 13 }: Props) {
   const router = useRouter();
   const center = pick ?? origin;
   const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
@@ -79,7 +82,7 @@ export default function EventMap({ origin, events = [], pick, onPick, onMapClick
         url={tileUrl}
       />
       <Recenter origin={center} />
-      <ClickCapture onPick={onPick} onMapClick={onMapClick} />
+      <MapGestures onPick={onPick} onMapInteract={onMapInteract} />
       {events
         .filter((event) => Number.isFinite(event.location?.lat) && Number.isFinite(event.location?.lng))
         .map((event) => (
