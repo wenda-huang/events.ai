@@ -32,6 +32,7 @@ function CreateEvent() {
   const [geoBusy, setGeoBusy] = useState(false);
   const [focusNonce, setFocusNonce] = useState(0);
   const [cities, setCities] = useState<City[]>([]);
+  const [autoInvite, setAutoInvite] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -105,6 +106,7 @@ function CreateEvent() {
         people_max: peopleMax,
         cost_estimate: cost,
         tags: selected,
+        auto_invite: autoInvite,
       });
       router.push(`/events/${created.id}`);
     } catch (err) {
@@ -161,6 +163,18 @@ function CreateEvent() {
         <div className="mt-5">
           <TagPicker tags={tags} selected={selected} onChange={setSelected} />
         </div>
+        <label className="mt-5 flex cursor-pointer items-center gap-2.5 text-sm text-cream">
+          <input
+            type="checkbox"
+            checked={autoInvite}
+            onChange={(e) => setAutoInvite(e.target.checked)}
+            className="checkbox-gold"
+          />
+          Auto-invite
+        </label>
+        <p className="mt-1.5 text-xs text-mute">
+          Invite nearby people who share this event’s tags, up to max capacity.
+        </p>
         {error && <p className="mt-4 text-sm text-rust">{error}</p>}
         <button className="btn-gold mt-6" disabled={busy || geoBusy}>
           {busy ? "Publishing…" : "Publish event"}

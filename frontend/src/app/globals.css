@@ -261,6 +261,31 @@ input[type="range"]::-moz-range-thumb:active {
   @apply w-full rounded-xl border border-line bg-ink px-3 py-2.5 text-sm text-cream placeholder:text-mute/70;
 }
 
+.checkbox-gold {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid #e2d5bf;
+  border-radius: 4px;
+  background: #fffdf8;
+}
+
+.checkbox-gold:checked {
+  border-color: #b9790a;
+  background: #b9790a;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8.2L6.4 11.1L12.5 4.8' stroke='%231c1814' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 12px 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.checkbox-gold:focus-visible {
+  outline: 2px solid #b9790a;
+  outline-offset: 2px;
+}
+
 .search-dots {
   display: inline-flex;
   align-items: center;

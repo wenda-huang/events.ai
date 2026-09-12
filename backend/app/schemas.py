@@ -50,3 +50,4 @@ class EventCreate(BaseModel):
     people_max: int = Field(default=20, ge=1)
     cost_estimate: str = "Free"
     tags: list[str] = []
+    auto_invite: bool = False

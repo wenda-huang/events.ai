@@ -10,7 +10,7 @@ from app.geo import MAX_RADIUS_MI, within_radius
 from app.models import City, Event, EventMembership, User
 from app.schemas import EventCreate
 from app.serialize import dump_tags, event_public, parse_tags
-from app.services import geocode
+from app.services import auto_invite, geocode
 from app.services.search import MIN_SCORE, expand_query, score_event
 from app.tags import normalize_tags
 
@@ -236,6 +236,9 @@ def create_event(
     db.add(event)
     db.flush()
     db.add(EventMembership(event_id=event.id, user_id=user.id, status="joined", reason="Host"))
+    db.flush()
+    if body.auto_invite:
+        auto_invite.invite_nearby_matches(db, event, host_id=user.id)
     db.commit()
     db.refresh(event)
     event = (
