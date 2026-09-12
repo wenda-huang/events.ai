@@ -52,6 +52,29 @@ export const PALETTES: Record<CoverTag, Palette> = {
   community: { sky0: "#f2e4c8", sky1: "#c47a4a", land: "#5a3a28", accent: "#f0a202", light: "#fff6e8" },
 };
 
+// Distinct, saturated per-tag hues for map pins. Kept separate from PALETTES
+// above, whose "accent" is nearly the same warm gold for most tags (by
+// design, for the illustrated cover art) and doesn't work as a category
+// color on the map.
+export const PIN_COLORS: Record<CoverTag, string> = {
+  music: "#f032e6",
+  food: "#f58231",
+  sports: "#3cb44b",
+  art: "#e6194b",
+  tech: "#17becf",
+  outdoors: "#7cb342",
+  nightlife: "#911eb4",
+  volunteering: "#008080",
+  workshops: "#9a6324",
+  markets: "#f1c40f",
+  comedy: "#e75480",
+  film: "#7e57c2",
+  fitness: "#800000",
+  gaming: "#4363d8",
+  networking: "#26a69a",
+  community: "#808000",
+};
+
 export function coverTag(tags?: string[] | null): CoverTag {
   const matches = (tags || []).filter((tag): tag is CoverTag => COVER_SET.has(tag));
   if (matches.length === 0) return "community";
