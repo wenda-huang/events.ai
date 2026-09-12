@@ -42,9 +42,7 @@ function MapView() {
   const recHeaderRef = useRef<HTMLDivElement>(null);
   const firstCardRef = useRef<HTMLDivElement>(null);
   const searchOverlayRef = useRef<HTMLDivElement>(null);
-  const filterInnerRef = useRef<HTMLDivElement>(null);
   const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
-  const [filterHeight, setFilterHeight] = useState(0);
   const [panelHeight, setPanelHeight] = useState<number>();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
@@ -100,17 +98,7 @@ function MapView() {
     const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [showFilters, filterHeight]);
-
-  useLayoutEffect(() => {
-    const inner = filterInnerRef.current;
-    if (!inner) return;
-    const apply = () => setFilterHeight(showFilters ? inner.scrollHeight : 0);
-    apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(inner);
-    return () => observer.disconnect();
-  }, [showFilters, allTags]);
+  }, []);
 
   useLayoutEffect(() => {
     const mapHeight = mapAreaRef.current?.clientHeight ?? 0;
@@ -162,35 +150,34 @@ function MapView() {
             </button>
           </div>
           <div
-            className="overflow-hidden transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-            style={{ height: filterHeight }}
+            className="grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            style={{ gridTemplateRows: showFilters ? "1fr" : "0fr" }}
             aria-hidden={!showFilters}
             inert={!showFilters}
           >
-            <div
-              ref={filterInnerRef}
-              className={`mt-2 space-y-3 border-t border-line pt-2 ${showFilters ? "" : "pointer-events-none"}`}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-2 text-xs text-mute">
-                  From
-                  <input className="field w-auto" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
-                </label>
-                <label className="flex items-center gap-2 text-xs text-mute">
-                  To
-                  <input className="field w-auto" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
-                </label>
-              </div>
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Recommendation tags</p>
-                  {filterTags.length > 0 && (
-                    <button type="button" className="text-[11px] text-gold" onClick={() => setFilterTags([])}>
-                      Clear
-                    </button>
-                  )}
+            <div className="min-h-0 overflow-hidden">
+              <div className="mt-2 space-y-3 border-t border-line pt-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs text-mute">
+                    From
+                    <input className="field w-auto" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-mute">
+                    To
+                    <input className="field w-auto" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+                  </label>
                 </div>
-                <TagPicker tags={allTags} selected={filterTags} onChange={setFilterTags} />
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Recommendation tags</p>
+                    {filterTags.length > 0 && (
+                      <button type="button" className="text-[11px] text-gold" onClick={() => setFilterTags([])}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <TagPicker tags={allTags} selected={filterTags} onChange={setFilterTags} />
+                </div>
               </div>
             </div>
           </div>
