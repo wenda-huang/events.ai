@@ -9,7 +9,7 @@ import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "
 
 import { client } from "@/lib/api";
 import { formatWhen } from "@/lib/geo";
-import { coverTag, PALETTES, type CoverTag } from "@/components/EventCover";
+import { coverTag, PIN_COLORS, type CoverTag } from "@/components/EventCover";
 import type { EventItem, Origin } from "@/lib/types";
 
 import "leaflet/dist/leaflet.css";
@@ -23,15 +23,23 @@ function hexToRgb(hex: string) {
   return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
 }
 
+function mixToward(hex: string, target: number, amount: number) {
+  const { r, g, b } = hexToRgb(hex);
+  const mix = (c: number) => Math.round(c + (target - c) * amount);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
 const singlePinIcons = new Map<CoverTag, L.DivIcon>();
 const clusterPinIcons = new Map<number, L.DivIcon>();
 
 function singlePinIcon(tag: CoverTag) {
   const cached = singlePinIcons.get(tag);
   if (cached) return cached;
-  const p = PALETTES[tag];
-  const { r, g, b } = hexToRgb(p.sky1);
-  const style = `--pin-light:${p.light};--pin-accent:${p.sky1};--pin-shadow:${p.land};--pin-glow:rgba(${r}, ${g}, ${b}, 0.3);`;
+  const accent = PIN_COLORS[tag];
+  const light = mixToward(accent, 255, 0.55);
+  const shadow = mixToward(accent, 0, 0.4);
+  const { r, g, b } = hexToRgb(accent);
+  const style = `--pin-light:${light};--pin-accent:${accent};--pin-shadow:${shadow};--pin-glow:rgba(${r}, ${g}, ${b}, 0.35);`;
   const icon = L.divIcon({
     className: "event-pin",
     html: `<span class="pin-dot" style="${style}"></span>`,
