@@ -17,6 +17,26 @@ body {
   font-feature-settings: "kern" on;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c4a574 #efe4d2;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #efe4d2;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c4a574;
+  border-radius: 999px;
+}
+
 .leaflet-container {
   background: #efe4d2;
   font-family: inherit;
@@ -92,22 +112,6 @@ body {
   overscroll-behavior: contain;
   pointer-events: auto;
   padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: #c4a574 #efe4d2;
-}
-
-.event-tip-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.event-tip-scroll::-webkit-scrollbar-track {
-  background: #efe4d2;
-  border-radius: 999px;
-}
-
-.event-tip-scroll::-webkit-scrollbar-thumb {
-  background: #c4a574;
-  border-radius: 999px;
 }
 
 .event-pin {
@@ -180,6 +184,12 @@ input,
 textarea,
 select {
   outline: none;
+}
+
+input[type="range"] {
+  accent-color: #c4a574;
+  height: 6px;
+  cursor: pointer;
 }
 
 .field {
