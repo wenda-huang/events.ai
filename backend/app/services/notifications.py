@@ -39,7 +39,8 @@ def should_notify_join(created_by_id: int | None, actor_id: int) -> bool:
 def recipient_allows_notifications(user: Any | None) -> bool:
     if user is None:
         return False
-    return bool(getattr(user, "notifications_enabled", True))
+    # None means the column was added after signup; treat as on.
+    return getattr(user, "notifications_enabled", True) is not False
 
 
 def notification_public(row: Notification) -> dict:
@@ -117,6 +118,7 @@ def _create(
         actor_user_id=actor_user_id,
     )
     db.add(row)
+    db.flush()
     return row
 
 
@@ -161,3 +163,39 @@ def mark_read(row: Notification) -> Notification:
     if row.read_at is None:
         row.read_at = datetime.now(timezone.utc).replace(tzinfo=None)
     return row
+
+
+def backfill_pending_invites(db: Session, user: User) -> None:
+    """Create missing invite notifications for memberships that already exist."""
+    from app.models import EventMembership
+    from sqlalchemy.orm import selectinload
+
+    if not recipient_allows_notifications(user):
+        return
+    rows = (
+        db.query(EventMembership)
+        .options(selectinload(EventMembership.event))
+        .filter(EventMembership.user_id == user.id, EventMembership.status == "invited")
+        .all()
+    )
+    added = False
+    for row in rows:
+        if row.event is None:
+            continue
+        reason = (row.reason or "").lower()
+        actor = None
+        if reason.startswith("auto-invite") and row.event.created_by_id:
+            actor = _load_user(db, row.event.created_by_id)
+        before = _existing(
+            db,
+            user_id=user.id,
+            kind=KIND_USER_INVITE if actor is not None else KIND_AI_INVITE,
+            event_id=row.event.id,
+            actor_user_id=actor.id if actor is not None else None,
+        )
+        if before is not None:
+            continue
+        notify_invite(db, recipient_id=user.id, event=row.event, actor=actor)
+        added = True
+    if added:
+        db.commit()

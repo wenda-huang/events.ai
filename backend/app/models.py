@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,7 +19,7 @@ class User(Base):
     tags: Mapped[str] = mapped_column(Text, default="[]")
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     default_radius_mi: Mapped[float] = mapped_column(Float, default=3.0)
-    notifications_enabled: Mapped[bool] = mapped_column(default=True)
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     events_created: Mapped[list["Event"]] = relationship(back_populates="creator")
