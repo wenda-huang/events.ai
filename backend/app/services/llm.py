@@ -34,13 +34,13 @@ Rules:
 
 
 def extract_events(documents: list[dict]) -> list[dict]:
-    api_key = settings.secret("openai_api_key")
+    api_key = settings.llm_api_key()
     if not api_key or not documents:
         return []
     blob = json.dumps(documents, ensure_ascii=False)[:20000]
     prompt = EXTRACT_PROMPT.format(tags=", ".join(TAG_DICTIONARY))
     body = {
-        "model": settings.secret("openai_model") or settings.openai_model,
+        "model": settings.llm_model(),
         "temperature": 0.2,
         "messages": [
             {"role": "system", "content": prompt},
@@ -50,8 +50,10 @@ def extract_events(documents: list[dict]) -> list[dict]:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "events.ai",
     }
-    url = (settings.secret("openai_base_url") or settings.openai_base_url).rstrip("/") + "/chat/completions"
+    url = settings.llm_base_url() + "/chat/completions"
     try:
         with httpx.Client(timeout=60) as client:
             res = client.post(url, headers=headers, json=body)

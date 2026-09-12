@@ -23,4 +23,4 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Put Querit and Carto keys in `config.ini` at the repo root. Add an OpenAI-compatible key in `.env` if you want the scanner to turn search hits into events.
+Open `http://localhost:3000`. Put Querit, Carto, and OpenRouter keys in `config.ini` at the repo root.
