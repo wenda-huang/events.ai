@@ -107,38 +107,40 @@ function clusterEvents(events: EventItem[], map: L.Map, threshold = CLUSTER_PIXE
 function EventTipBody({ events }: { events: EventItem[] }) {
   const multi = events.length > 1;
   return (
-    <div className={multi ? "event-tip-scroll min-w-48" : "min-w-44"} onWheel={(e) => e.stopPropagation()}>
+    <>
       {multi && (
-        <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gold">
+        <p className="event-hover-card-heading">
           {events.length} events
         </p>
       )}
-      <div className={multi ? "space-y-1" : undefined}>
-        {events.map((event) => {
-          const body = (
-            <>
-              <p className="font-display text-sm text-cream">{event.title}</p>
-              <p className="mt-0.5 text-[11px] text-mute">{formatWhen(event.starts_at)}</p>
-              <p className="mt-0.5 text-[11px] text-gold">{event.cost_estimate}</p>
-              {(event.tags || []).length > 0 && (
-                <p className="mt-0.5 text-[11px] capitalize text-cream/80">{event.tags.join(" · ")}</p>
-              )}
-            </>
-          );
-          return multi ? (
-            <Link
-              key={event.id}
-              href={`/events/${event.id}`}
-              className="-mx-1 block rounded-lg px-1.5 py-1.5 hover:bg-ink"
-            >
-              {body}
-            </Link>
-          ) : (
-            <div key={event.id}>{body}</div>
-          );
-        })}
+      <div className={multi ? "event-tip-scroll min-w-48" : "min-w-44"}>
+        <div className={multi ? "space-y-1" : undefined}>
+          {events.map((event) => {
+            const body = (
+              <>
+                <p className="font-display text-sm text-cream">{event.title}</p>
+                <p className="mt-0.5 text-[11px] text-mute">{formatWhen(event.starts_at)}</p>
+                <p className="mt-0.5 text-[11px] text-gold">{event.cost_estimate}</p>
+                {(event.tags || []).length > 0 && (
+                  <p className="mt-0.5 text-[11px] capitalize text-cream/80">{event.tags.join(" · ")}</p>
+                )}
+              </>
+            );
+            return multi ? (
+              <Link
+                key={event.id}
+                href={`/events/${event.id}`}
+                className="-mx-1 block rounded-lg px-1.5 py-1.5 hover:bg-ink"
+              >
+                {body}
+              </Link>
+            ) : (
+              <div key={event.id}>{body}</div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -152,8 +154,20 @@ function ClusterHoverCard({
   onLeave: () => void;
 }) {
   const map = useMap();
+  const cardRef = useRef<HTMLDivElement>(null);
   const [, tick] = useReducer((n: number) => n + 1, 0);
   useMapEvents({ move: tick, zoom: tick });
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    L.DomEvent.disableScrollPropagation(el);
+    L.DomEvent.disableClickPropagation(el);
+    map.scrollWheelZoom.disable();
+    return () => {
+      map.scrollWheelZoom.enable();
+    };
+  }, [map]);
 
   const container = map.getContainer();
   const point = map.latLngToContainerPoint([cluster.lat, cluster.lng]);
@@ -163,12 +177,11 @@ function ClusterHoverCard({
 
   return createPortal(
     <div
-      className={`event-hover-card ${flipDown ? "event-hover-card-below" : ""}`}
+      ref={cardRef}
+      className={`event-hover-card ${cluster.events.length > 1 ? "event-hover-card-list" : ""} ${flipDown ? "event-hover-card-below" : ""}`}
       style={{ left, top: point.y }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
-      onMouseDown={(e) => e.stopPropagation()}
-      onWheel={(e) => e.stopPropagation()}
     >
       <EventTipBody events={cluster.events} />
     </div>,

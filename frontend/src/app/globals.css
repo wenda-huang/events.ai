@@ -51,6 +51,22 @@ body {
   pointer-events: auto;
 }
 
+.event-hover-card-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  padding-right: 8px;
+}
+
+.event-hover-card-heading {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b9790a;
+}
+
 .event-hover-card::after {
   content: "";
   position: absolute;
@@ -70,11 +86,28 @@ body {
 }
 
 .event-tip-scroll {
-  max-height: 240px;
-  overflow-y: auto;
+  min-height: 0;
+  max-height: 220px;
+  overflow-y: scroll;
   overscroll-behavior: contain;
   pointer-events: auto;
   padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #c4a574 #efe4d2;
+}
+
+.event-tip-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.event-tip-scroll::-webkit-scrollbar-track {
+  background: #efe4d2;
+  border-radius: 999px;
+}
+
+.event-tip-scroll::-webkit-scrollbar-thumb {
+  background: #c4a574;
+  border-radius: 999px;
 }
 
 .event-pin {
