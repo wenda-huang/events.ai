@@ -207,7 +207,6 @@ function ClusterHoverCard({
 
 function ClusteredMarkers({ events }: { events: EventItem[] }) {
   const map = useMap();
-  const router = useRouter();
   const hideTimer = useRef<number | null>(null);
   const [zoom, setZoom] = useState(() => map.getZoom());
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -245,10 +244,7 @@ function ClusteredMarkers({ events }: { events: EventItem[] }) {
           eventHandlers={{
             mouseover: () => show(cluster.id),
             mouseout: hideSoon,
-            click: () => {
-              if (cluster.events.length === 1) router.push(`/events/${cluster.events[0].id}`);
-              else show(cluster.id);
-            },
+            click: () => show(cluster.id),
           }}
         />
       ))}
