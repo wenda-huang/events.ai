@@ -35,6 +35,7 @@ export type EventItem = {
   my_status: "invited" | "joined" | "declined" | null;
   distance_mi: number | null;
   tag_overlap?: number;
+  relevance?: number;
   invite_reason?: string | null;
 };
 
