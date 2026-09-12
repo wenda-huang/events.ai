@@ -34,15 +34,24 @@ def _exec_ignore_duplicate(conn, statement: str) -> None:
 
 def ensure_columns() -> None:
     inspector = inspect(engine)
-    if "events" not in inspector.get_table_names():
-        return
-    cols = {col["name"] for col in inspector.get_columns("events")}
+    names = inspector.get_table_names()
     with engine.begin() as conn:
-        if "estimated_fields" not in cols:
-            _exec_ignore_duplicate(conn, "ALTER TABLE events ADD COLUMN estimated_fields TEXT DEFAULT '[]'")
-        if "city_id" not in cols:
-            _exec_ignore_duplicate(conn, "ALTER TABLE events ADD COLUMN city_id INTEGER")
-        _exec_ignore_duplicate(conn, "CREATE INDEX IF NOT EXISTS ix_events_city_id ON events (city_id)")
+        if "events" in names:
+            cols = {col["name"] for col in inspector.get_columns("events")}
+            if "estimated_fields" not in cols:
+                _exec_ignore_duplicate(conn, "ALTER TABLE events ADD COLUMN estimated_fields TEXT DEFAULT '[]'")
+            if "city_id" not in cols:
+                _exec_ignore_duplicate(conn, "ALTER TABLE events ADD COLUMN city_id INTEGER")
+            _exec_ignore_duplicate(conn, "CREATE INDEX IF NOT EXISTS ix_events_city_id ON events (city_id)")
+        if "users" in names:
+            user_cols = {col["name"] for col in inspector.get_columns("users")}
+            if "notifications_enabled" not in user_cols:
+                _exec_ignore_duplicate(
+                    conn, "ALTER TABLE users ADD COLUMN notifications_enabled BOOLEAN DEFAULT TRUE"
+                )
+            _exec_ignore_duplicate(
+                conn, "UPDATE users SET notifications_enabled = TRUE WHERE notifications_enabled IS NULL"
+            )
 
 
 def get_db():

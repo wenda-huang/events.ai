@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,10 +19,15 @@ class User(Base):
     tags: Mapped[str] = mapped_column(Text, default="[]")
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     default_radius_mi: Mapped[float] = mapped_column(Float, default=3.0)
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     events_created: Mapped[list["Event"]] = relationship(back_populates="creator")
     memberships: Mapped[list["EventMembership"]] = relationship(back_populates="user")
+    notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="user",
+        foreign_keys="Notification.user_id",
+    )
 
 
 class City(Base):
@@ -85,3 +90,19 @@ class EventMembership(Base):
 
     event: Mapped[Event] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(back_populates="memberships")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(String(400), default="")
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("events.id"), nullable=True, index=True)
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    user: Mapped[User] = relationship(back_populates="notifications", foreign_keys=[user_id])

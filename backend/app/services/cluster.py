@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.geo import haversine_mi
 from app.models import Event, EventMembership, User
 from app.serialize import parse_tags
+from app.services.notifications import notify_invite
 
 CLUSTER_RADIUS_MI = 3.0
 
@@ -91,6 +92,7 @@ def run_cluster(db: Session) -> dict:
                     reason=reason,
                 )
             )
+            notify_invite(db, recipient_id=member.id, event=event)
             invited += 1
             seats -= 1
     db.commit()

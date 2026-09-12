@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { NotificationBell } from "@/components/Notifications";
+
 const LINKS = [
   { href: "/map", label: "Map" },
   { href: "/my-events", label: "My events" },
@@ -21,6 +23,7 @@ export function Sidebar() {
         </p>
       </Link>
       <nav className="flex flex-1 flex-col gap-1">
+        <NotificationBell />
         {LINKS.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
           return (

@@ -4,6 +4,7 @@ from app.geo import haversine_mi
 from app.models import Event, EventMembership, User
 from app.serialize import parse_tags
 from app.services.cluster import CLUSTER_RADIUS_MI
+from app.services.notifications import notify_invite
 
 
 def select_auto_invitees(
@@ -66,6 +67,7 @@ def invite_nearby_matches(db: Session, event: Event, host_id: int) -> int:
         member_ids=member_ids,
         candidates=users,
     )
+    host = db.get(User, host_id)
     for user in chosen:
         shared = sorted(set(parse_tags(user.tags)) & event_tags)
         db.add(
@@ -76,4 +78,5 @@ def invite_nearby_matches(db: Session, event: Event, host_id: int) -> int:
                 reason=f"Auto-invite: {', '.join(shared[:3]) or 'shared interests'}",
             )
         )
+        notify_invite(db, recipient_id=user.id, event=event, actor=host)
     return len(chosen)

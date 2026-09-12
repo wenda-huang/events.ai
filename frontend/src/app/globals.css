@@ -333,3 +333,18 @@ input[type="range"]::-moz-range-thumb:active {
 .btn-ghost {
   @apply btn border border-line bg-transparent text-cream hover:border-gold/60;
 }
+
+@keyframes notification-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notification-toast {
+  animation: notification-in 0.25s ease-out;
+}

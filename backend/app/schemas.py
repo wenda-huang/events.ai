@@ -34,6 +34,7 @@ class ProfilePatch(BaseModel):
     lat: float | None = None
     lng: float | None = None
     default_radius_mi: float | None = Field(default=None, ge=0.5, le=12500)
+    notifications_enabled: bool | None = None
 
 
 class EventCreate(BaseModel):

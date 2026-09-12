@@ -90,6 +90,7 @@ function NotifyToggle({
 function Settings() {
   const router = useRouter();
   const [radiusSlider, setRadiusSlider] = useState(radiusMiToSlider(3));
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [notify, setNotify] = useState<NotifyPrefs>(DEFAULT_NOTIFY);
   const [message, setMessage] = useState("");
@@ -100,6 +101,7 @@ function Settings() {
     setNotify(loadNotifyPrefs());
     client.me().then((me) => {
       setRadiusSlider(radiusMiToSlider(me.default_radius_mi));
+      setNotificationsEnabled(me.notifications_enabled !== false);
       setIsAdmin(Boolean(me.is_admin) || me.email.toLowerCase() === "admin@admin.com");
     });
   }, []);
@@ -107,6 +109,19 @@ function Settings() {
   async function saveRadius() {
     await client.patchMe({ default_radius_mi: radius });
     setMessage("Default radius saved.");
+  }
+
+  async function toggleNotifications() {
+    const next = !notificationsEnabled;
+    setNotificationsEnabled(next);
+    try {
+      const me = await client.patchMe({ notifications_enabled: next });
+      setNotificationsEnabled(me.notifications_enabled !== false);
+      setMessage(next ? "Notifications on." : "Notifications off.");
+    } catch (err) {
+      setNotificationsEnabled(!next);
+      setMessage(err instanceof Error ? err.message : "Could not update notifications");
+    }
   }
 
   async function run(kind: "scan" | "cluster") {
@@ -160,6 +175,29 @@ function Settings() {
       <section className="mt-6 rounded-2xl border border-line bg-card p-5">
         <h2 className="text-sm text-cream">Notifications</h2>
         <p className="mt-2 text-sm text-mute">
+          Live alerts when events.ai or another person invites you, and when someone joins an event you posted.
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={notificationsEnabled}
+          onClick={toggleNotifications}
+          className="mt-4 flex w-full items-center justify-between rounded-xl border border-line bg-ink px-4 py-3 text-left"
+        >
+          <span className="text-sm text-cream">{notificationsEnabled ? "On" : "Off"}</span>
+          <span
+            className={`relative h-6 w-11 rounded-full transition-colors ${
+              notificationsEnabled ? "bg-gold" : "bg-line"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow-sm transition-transform ${
+                notificationsEnabled ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </span>
+        </button>
+        <p className="mt-5 text-sm text-mute">
           Choose how you hear about invites, reminders, and nearby meetups.
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

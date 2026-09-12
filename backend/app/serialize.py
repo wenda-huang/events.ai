@@ -30,6 +30,7 @@ def user_public(user: User) -> dict:
         "tags": parse_tags(user.tags),
         "onboarded": user.onboarded_at is not None,
         "default_radius_mi": user.default_radius_mi,
+        "notifications_enabled": getattr(user, "notifications_enabled", True) is not False,
         "is_admin": is_admin(user),
     }
 
