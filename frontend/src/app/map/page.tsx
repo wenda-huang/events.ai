@@ -38,6 +38,8 @@ function MapView() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [recommendedExpanded, setRecommendedExpanded] = useState(false);
   const recommendedListRef = useRef<HTMLDivElement>(null);
+  const searchOverlayRef = useRef<HTMLDivElement>(null);
+  const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
   const [error, setError] = useState("");
@@ -85,10 +87,20 @@ function MapView() {
     };
   }, [origin, radius, start, end, q]);
 
+  useEffect(() => {
+    const el = searchOverlayRef.current;
+    if (!el) return;
+    const update = () => setSearchOverlayHeight(el.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [showFilters]);
+
   return (
     <div className="relative min-h-0 flex-1">
       <EventMap origin={origin} events={events} />
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] p-4">
+      <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -165,9 +177,10 @@ function MapView() {
               setRecommendedExpanded(false);
             }
           }}
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col p-4 transition-[height] duration-300 ease-out ${
-            recommendedExpanded ? "h-[min(90vh,100%)]" : "h-[22vh]"
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col p-4 transition-[top,height] duration-300 ease-out ${
+            recommendedExpanded ? "" : "h-[22vh]"
           }`}
+          style={recommendedExpanded ? { top: searchOverlayHeight } : undefined}
         >
           <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
             <div className="mb-2 flex shrink-0 items-center justify-between">
