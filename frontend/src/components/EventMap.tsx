@@ -11,7 +11,7 @@ import type { EventItem, Origin } from "@/lib/types";
 
 import "leaflet/dist/leaflet.css";
 
-const DEFAULT_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const DEFAULT_TILES = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 
 const pin = L.divIcon({
   className: "event-pin",

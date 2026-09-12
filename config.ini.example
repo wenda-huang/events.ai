@@ -4,7 +4,7 @@ api_key =
 [carto]
 api_base_url = https://gcp-us-east1.api.carto.com
 api_key =
-tile_url = https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
+tile_url = https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
 
 [openrouter]
 api_key =
