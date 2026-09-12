@@ -11,8 +11,8 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/scan")
-def trigger_scan(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return run_scan(db)
+def trigger_scan(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return run_scan(db, user=user)
 
 
 @router.post("/cluster")

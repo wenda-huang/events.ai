@@ -25,6 +25,7 @@ export type EventItem = {
   people_min: number;
   people_max: number;
   cost_estimate: string;
+  estimated_fields: string[];
   tags: string[];
   source: "user" | "ai";
   source_url: string | null;

@@ -25,6 +25,8 @@ def ini_values() -> dict[str, str]:
     values: dict[str, str] = {}
     if parser.has_section("querit"):
         values["querit_api_key"] = parser.get("querit", "api_key", fallback="").strip()
+        values["page_char_limit"] = parser.get("querit", "page_char_limit", fallback="4000").strip()
+        values["result_count"] = parser.get("querit", "result_count", fallback="50").strip()
     if parser.has_section("carto"):
         values["carto_api_key"] = parser.get("carto", "api_key", fallback="").strip()
         values["carto_api_base_url"] = parser.get("carto", "api_base_url", fallback="").strip()
@@ -79,6 +81,18 @@ class Settings(BaseSettings):
 
     def llm_model(self) -> str:
         return ini_values().get("llm_model") or "openai/gpt-4o-mini"
+
+    def page_char_limit(self) -> int:
+        try:
+            return max(500, min(20000, int(ini_values().get("page_char_limit") or 4000)))
+        except ValueError:
+            return 4000
+
+    def result_count(self) -> int:
+        try:
+            return max(1, min(100, int(ini_values().get("result_count") or 50)))
+        except ValueError:
+            return 50
 
 
 settings = Settings()

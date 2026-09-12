@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import Base, SessionLocal, engine
+from app.database import Base, SessionLocal, engine, ensure_columns
 from app.routers import auth, events, jobs, users
 from app.seed import seed_if_empty
 from app.services.cluster import run_cluster
@@ -33,6 +33,7 @@ def _job_cluster() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_columns()
     db = SessionLocal()
     try:
         seed_if_empty(db)

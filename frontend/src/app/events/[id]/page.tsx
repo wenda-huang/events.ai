@@ -56,7 +56,12 @@ function EventDetail() {
         {event.source === "ai" ? "AI-discovered" : "Posted by a neighbor"} · {event.location.city}
       </p>
       <h1 className="mt-2 font-display text-5xl leading-tight text-cream">{event.title}</h1>
-      <p className="mt-4 text-mute">{formatWhen(event.starts_at)} — {formatWhen(event.ends_at)}</p>
+        <p className="mt-4 text-mute">
+          {formatWhen(event.starts_at)} — {formatWhen(event.ends_at)}
+          {event.estimated_fields?.includes("ends_at") && (
+            <span className="ml-2 text-[10px] uppercase tracking-wide text-gold">end estimated</span>
+          )}
+        </p>
       <p className="mt-2 text-sm text-cream/80">{event.location.address}</p>
       <div className="mt-6 flex flex-wrap gap-2">
         {event.tags.map((tag) => (
@@ -71,11 +76,19 @@ function EventDetail() {
           <dt className="text-mute">People</dt>
           <dd className="mt-1 text-cream">
             {event.attendee_count} joined · {event.people_min}–{event.people_max}
+            {(event.estimated_fields?.includes("people_min") || event.estimated_fields?.includes("people_max")) && (
+              <span className="ml-2 text-[10px] uppercase tracking-wide text-gold">estimated</span>
+            )}
           </dd>
         </div>
         <div className="rounded-2xl border border-line bg-card p-4">
           <dt className="text-mute">Cost</dt>
-          <dd className="mt-1 text-cream">{event.cost_estimate}</dd>
+          <dd className="mt-1 text-cream">
+            {event.cost_estimate}
+            {event.estimated_fields?.includes("cost_estimate") && (
+              <span className="ml-2 text-[10px] uppercase tracking-wide text-gold">estimated</span>
+            )}
+          </dd>
         </div>
       </dl>
       {event.source_url && (

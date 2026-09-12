@@ -43,6 +43,7 @@ class Event(Base):
     tags: Mapped[str] = mapped_column(Text, default="[]")
     source: Mapped[str] = mapped_column(String(20), default="user")
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    estimated_fields: Mapped[str] = mapped_column(Text, default="[]")
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

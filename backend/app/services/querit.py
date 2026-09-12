@@ -1,23 +1,17 @@
 import httpx
 
 from app.config import settings
-from app.tags import TAG_DICTIONARY
 
 QUERIT_SEARCH = "https://api.querit.ai/v1/search"
 QUERIT_CONTENTS = "https://api.querit.ai/v1/contents"
 
-CITY_QUERIES = [
-    "upcoming events in Pittsburgh PA this week",
-    "things to do Pittsburgh next two weeks concerts festivals markets",
-]
+
+def search_city(city: str, count: int = 50) -> list[dict]:
+    query = f"upcoming local events concerts festivals meetups in {city} in the next two weeks"
+    return search(query, count=count)
 
 
-def scan_queries() -> list[str]:
-    tagged = [f"{tag} events Pittsburgh PA this week" for tag in TAG_DICTIONARY]
-    return CITY_QUERIES + tagged
-
-
-def search(query: str, count: int = 8) -> list[dict]:
+def search(query: str, count: int = 50) -> list[dict]:
     if not settings.secret("querit_api_key"):
         return []
     headers = {
@@ -29,11 +23,10 @@ def search(query: str, count: int = 8) -> list[dict]:
         "query": query,
         "count": count,
         "date_range": "w4",
-        "countries": ["united states"],
         "languages": ["english"],
     }
     try:
-        with httpx.Client(timeout=30) as client:
+        with httpx.Client(timeout=45) as client:
             res = client.post(QUERIT_SEARCH, headers=headers, json=payload)
             res.raise_for_status()
             data = res.json()
@@ -55,10 +48,10 @@ def search(query: str, count: int = 8) -> list[dict]:
                 "site_name": item.get("site_name") or "",
             }
         )
-    return cleaned
+    return cleaned[:count]
 
 
-def fetch_contents(urls: list[str]) -> dict[str, str]:
+def fetch_contents(urls: list[str], char_limit: int = 4000) -> dict[str, str]:
     key = settings.secret("querit_api_key")
     if not key or not urls:
         return {}
@@ -71,8 +64,12 @@ def fetch_contents(urls: list[str]) -> dict[str, str]:
     for chunk_start in range(0, len(urls), 8):
         batch = urls[chunk_start : chunk_start + 8]
         try:
-            with httpx.Client(timeout=40) as client:
-                res = client.post(QUERIT_CONTENTS, headers=headers, json={"urls": batch})
+            with httpx.Client(timeout=60) as client:
+                res = client.post(
+                    QUERIT_CONTENTS,
+                    headers=headers,
+                    json={"urls": batch, "format": "text", "crawlTimeout": 30},
+                )
                 res.raise_for_status()
                 data = res.json()
         except httpx.HTTPError:
@@ -88,5 +85,5 @@ def fetch_contents(urls: list[str]) -> dict[str, str]:
             url = item.get("url") or ""
             text = item.get("text") or item.get("markdown") or item.get("content") or ""
             if url and text:
-                pages[url] = str(text)[:8000]
+                pages[url] = str(text)[:char_limit]
     return pages

@@ -57,7 +57,7 @@ function Settings() {
       <section className="mt-6 rounded-2xl border border-line bg-card p-5">
         <h2 className="text-sm text-cream">AI jobs</h2>
         <p className="mt-2 text-sm text-mute">
-          Scan Pittsburgh listings with Querit, then cluster nearby users and auto-invite them. Jobs also run every 6 hours on the server.
+          Scan Querit for the top 50 listings in your city, open those event pages, then summarize each one with OpenRouter. This can take a few minutes.
         </p>
         <div className="mt-4 flex gap-3">
           <button className="btn-gold" disabled={busy} onClick={() => run("scan")}>

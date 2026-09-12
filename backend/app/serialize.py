@@ -63,6 +63,7 @@ def event_public(
         "people_min": event.people_min,
         "people_max": event.people_max,
         "cost_estimate": event.cost_estimate,
+        "estimated_fields": parse_tags(getattr(event, "estimated_fields", None) or "[]"),
         "tags": parse_tags(event.tags),
         "source": event.source,
         "source_url": event.source_url,

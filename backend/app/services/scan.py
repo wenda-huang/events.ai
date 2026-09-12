@@ -3,11 +3,9 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.geo import PITTSBURGH_LAT, PITTSBURGH_LNG
-from app.models import Event
+from app.models import Event, User
 from app.serialize import dump_tags
 from app.services import geocode, llm, querit
-from app.tags import normalize_tags
 
 
 def _naive(value: str | datetime) -> datetime | None:
@@ -27,83 +25,136 @@ def _dedupe_key(title: str, starts: datetime, lat: float, lng: float) -> tuple:
     return (title.strip().lower(), starts.date().isoformat(), round(lat, 3), round(lng, 3))
 
 
-def run_scan(db: Session) -> dict:
+def city_for_user(user: User | None) -> str:
+    if user is not None and user.lat is not None and user.lng is not None:
+        city = geocode.reverse_city(user.lat, user.lng)
+        if city:
+            return city
+    return "Pittsburgh"
+
+
+def cities_to_scan(db: Session, user: User | None) -> list[str]:
+    if user is not None:
+        return [city_for_user(user)]
+    cities: list[str] = []
+    seen: set[str] = set()
+    rows = db.query(User).filter(User.onboarded_at.isnot(None), User.lat.isnot(None), User.lng.isnot(None)).all()
+    for row in rows:
+        city = city_for_user(row)
+        key = city.lower()
+        if key not in seen:
+            seen.add(key)
+            cities.append(city)
+    return cities or ["Pittsburgh"]
+
+
+def run_scan(db: Session, user: User | None = None) -> dict:
     if not settings.secret("querit_api_key"):
         return {"ok": False, "reason": "QUERIT_API_KEY missing", "created": 0}
     if not settings.llm_api_key():
         return {"ok": False, "reason": "OpenRouter API key missing — add it under [openrouter] in config.ini", "created": 0}
 
-    seen_urls = {e.source_url for e in db.query(Event).filter(Event.source_url.isnot(None)).all()}
-    existing_keys = {
-        _dedupe_key(e.title, e.starts_at, e.lat, e.lng) for e in db.query(Event).all()
-    }
+    cities = cities_to_scan(db, user)
+    char_limit = settings.page_char_limit()
+    result_count = settings.result_count()
+    created = 0
+    scanned_docs = 0
+    summarized = 0
 
-    documents: list[dict] = []
-    urls: list[str] = []
-    for query in querit.scan_queries():
-        for item in querit.search(query, count=6):
-            if not item["url"] or item["url"] in seen_urls:
-                continue
-            seen_urls.add(item["url"])
-            documents.append(item)
-            urls.append(item["url"])
-        if len(documents) >= 40:
-            break
-
-    pages = querit.fetch_contents(urls[:16])
-    for doc in documents:
-        if doc["url"] in pages:
-            doc["content"] = pages[doc["url"]][:4000]
-
-    extracted = llm.extract_events(documents)
+    existing_urls = {e.source_url for e in db.query(Event).filter(Event.source_url.isnot(None)).all()}
+    existing_keys = {_dedupe_key(e.title, e.starts_at, e.lat, e.lng) for e in db.query(Event).all()}
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     horizon = now + timedelta(days=35)
-    created = 0
 
-    for item in extracted:
-        title = (item.get("title") or "").strip()
-        starts = _naive(item.get("starts_at"))
-        ends = _naive(item.get("ends_at"))
-        address = (item.get("address") or "").strip()
-        source_url = (item.get("source_url") or "").strip() or None
-        if not title or starts is None:
-            continue
-        if ends is None:
-            ends = starts + timedelta(hours=2)
-        if ends <= starts or starts < now - timedelta(days=1) or starts > horizon:
-            continue
-        if source_url and db.query(Event).filter(Event.source_url == source_url).first():
-            continue
-        coords = geocode.geocode_pittsburgh(address or title)
-        if coords is None:
-            coords = (PITTSBURGH_LAT, PITTSBURGH_LNG)
-        lat, lng = coords
-        key = _dedupe_key(title, starts, lat, lng)
-        if key in existing_keys:
-            continue
-        existing_keys.add(key)
-        people_min = int(item.get("people_min") or 2)
-        people_max = int(item.get("people_max") or 16)
-        if people_max < people_min:
-            people_max = people_min
-        db.add(
-            Event(
-                title=title[:200],
-                description=(item.get("description") or "")[:4000],
-                lat=lat,
-                lng=lng,
-                address=address[:300],
-                city="Pittsburgh",
-                starts_at=starts,
-                ends_at=ends,
-                people_min=max(1, people_min),
-                people_max=min(80, people_max),
-                cost_estimate=(item.get("cost_estimate") or "Free")[:80],
-                tags=dump_tags(normalize_tags(item.get("tags") or [])),
-                source="ai",
-                source_url=source_url,
-            )
-        )
-        created += 1
+    for city in cities:
+        hits = querit.search_city(city, count=result_count)
+        documents = []
+        urls = []
+        for item in hits:
+            url = item.get("url") or ""
+            if not url or url in existing_urls:
+                continue
+            existing_urls.add(url)
+            documents.append(item)
+            urls.append(url)
+        scanned_docs += len(documents)
+        pages = querit.fetch_contents(urls, char_limit=char_limit)
+        for doc in documents:
+            if doc["url"] in pages:
+                doc["content"] = pages[doc["url"]][:char_limit]
+            extracted = llm.summarize_page(city, doc)
+            if extracted is None:
+                continue
+            summarized += 1
+            if _persist_extracted(db, extracted, city, now, horizon, existing_keys, existing_urls):
+                created += 1
     db.commit()
-    return {"ok": True, "created": created, "scanned_docs": len(documents)}
+    return {
+        "ok": True,
+        "created": created,
+        "scanned_docs": scanned_docs,
+        "summarized": summarized,
+        "cities": cities,
+        "result_count": result_count,
+        "page_char_limit": char_limit,
+    }
+
+
+def _persist_extracted(
+    db: Session,
+    extracted: llm.ExtractedEvent,
+    fallback_city: str,
+    now: datetime,
+    horizon: datetime,
+    existing_keys: set,
+    existing_urls: set,
+) -> bool:
+    title = extracted.title.strip()
+    starts = _naive(extracted.starts_at)
+    ends = _naive(extracted.ends_at)
+    address = extracted.address.strip()
+    city = extracted.city.strip() or fallback_city
+    source_url = extracted.source_url.strip() or None
+    if not title or starts is None:
+        return False
+    if ends is None:
+        ends = starts + timedelta(hours=2)
+    if ends <= starts or starts < now - timedelta(days=1) or starts > horizon:
+        return False
+    if source_url and db.query(Event).filter(Event.source_url == source_url).first():
+        return False
+    coords = geocode.geocode_place(address or title, city)
+    if coords is None:
+        coords = geocode.geocode_place(city, city)
+    if coords is None:
+        return False
+    lat, lng = coords
+    key = _dedupe_key(title, starts, lat, lng)
+    if key in existing_keys:
+        return False
+    existing_keys.add(key)
+    if source_url:
+        existing_urls.add(source_url)
+    people_min = max(1, extracted.people_min)
+    people_max = max(people_min, extracted.people_max)
+    db.add(
+        Event(
+            title=title[:200],
+            description=extracted.description.strip()[:4000],
+            lat=lat,
+            lng=lng,
+            address=address[:300],
+            city=city[:80],
+            starts_at=starts,
+            ends_at=ends,
+            people_min=people_min,
+            people_max=min(200, people_max),
+            cost_estimate=(extracted.cost_estimate or "Free")[:80],
+            tags=dump_tags(extracted.tags),
+            source="ai",
+            source_url=source_url,
+            estimated_fields=dump_tags(list(extracted.estimated_fields)),
+        )
+    )
+    db.commit()
+    return True

@@ -1,5 +1,7 @@
 [querit]
 api_key =
+page_char_limit = 4000
+result_count = 50
 
 [carto]
 api_base_url = https://gcp-us-east1.api.carto.com
