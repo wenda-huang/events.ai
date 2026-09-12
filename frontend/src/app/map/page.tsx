@@ -25,6 +25,11 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+function matchesFilterTags(event: EventItem, tags: string[]) {
+  if (tags.length === 0) return true;
+  return (event.tags || []).some((tag) => tags.includes(tag));
+}
+
 function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
   const [origin, setOrigin] = useState<Origin>(PITTSBURGH);
@@ -47,10 +52,14 @@ function MapView() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
   const [error, setError] = useState("");
-  const filteredRecommended = useMemo(() => {
-    if (filterTags.length === 0) return recommended;
-    return recommended.filter((event) => (event.tags || []).some((tag) => filterTags.includes(tag)));
-  }, [recommended, filterTags]);
+  const filteredEvents = useMemo(
+    () => events.filter((event) => matchesFilterTags(event, filterTags)),
+    [events, filterTags]
+  );
+  const filteredRecommended = useMemo(
+    () => recommended.filter((event) => matchesFilterTags(event, filterTags)),
+    [recommended, filterTags]
+  );
 
   useEffect(() => {
     client.tags().then((res) => setAllTags(res.tags));
@@ -114,7 +123,7 @@ function MapView() {
 
   return (
     <div ref={mapAreaRef} className="relative min-h-0 flex-1">
-      <EventMap origin={origin} events={events} onMapInteract={() => setRecommendedExpanded(false)} />
+      <EventMap origin={origin} events={filteredEvents} onMapInteract={() => setRecommendedExpanded(false)} />
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
@@ -169,7 +178,7 @@ function MapView() {
                 </div>
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Recommendation tags</p>
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Tags</p>
                     {filterTags.length > 0 && (
                       <button type="button" className="text-[11px] text-gold" onClick={() => setFilterTags([])}>
                         Clear
@@ -183,7 +192,8 @@ function MapView() {
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-mute">
             <span>
-              {events.length} events · default window is 2 weeks
+              {filteredEvents.length} events
+              {filterTags.length > 0 ? " filtered" : ""} · default window is 2 weeks
               {outsideCity ? " · showing Pittsburgh (you’re outside the launch city)" : ""}
             </span>
             {error && <span className="text-rust">{error}</span>}
