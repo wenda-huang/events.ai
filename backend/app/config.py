@@ -17,7 +17,7 @@ def _ini_paths() -> list[Path]:
 
 
 def ini_values() -> dict[str, str]:
-    parser = ConfigParser(interpolation=None)
+    parser = ConfigParser()
     for path in _ini_paths():
         if path.is_file():
             parser.read(path, encoding="utf-8")
