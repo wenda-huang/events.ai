@@ -105,6 +105,7 @@ body {
 .user-location-pin {
   background: transparent;
   border: none;
+  cursor: pointer;
 }
 
 .user-dot {
