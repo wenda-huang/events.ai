@@ -1,5 +1,5 @@
 import { clearToken, getToken } from "@/lib/auth";
-import type { City, EventItem, User } from "@/lib/types";
+import type { AppNotification, City, EventItem, User } from "@/lib/types";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "");
 
@@ -187,7 +187,7 @@ export const client = {
   cities: () => api<{ cities: City[] }>("/cities"),
   onboard: (body: { name: string; phone?: string; tags: string[]; lat?: number; lng?: number }) =>
     api<User>("/me/onboarding", { method: "POST", body: JSON.stringify(body) }),
-  patchMe: (body: Partial<User> & { default_radius_mi?: number }) =>
+  patchMe: (body: Partial<User> & { default_radius_mi?: number; notifications_enabled?: boolean }) =>
     api<User>("/me", { method: "PATCH", body: JSON.stringify(body) }),
   events: (params: URLSearchParams) => api<{ events: EventItem[] }>(`/events?${params}`),
   recommended: (params: URLSearchParams) => api<{ events: EventItem[] }>(`/events/recommended?${params}`),
@@ -209,6 +209,10 @@ export const client = {
   scan: () => scanStream(() => undefined),
   scanStream,
   cluster: () => api<{ ok: boolean; clusters?: number; invites_created?: number }>("/jobs/cluster", { method: "POST" }),
+  notifications: () =>
+    api<{ notifications: AppNotification[]; unread_count: number; enabled: boolean }>("/notifications"),
+  readNotification: (id: number) => api<AppNotification>(`/notifications/${id}/read`, { method: "POST" }),
+  readAllNotifications: () => api<{ ok: boolean; updated: number }>("/notifications/read-all", { method: "POST" }),
   mapConfig: () =>
     api<{
       carto_api_base_url: string;

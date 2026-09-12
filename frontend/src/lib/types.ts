@@ -8,6 +8,7 @@ export type User = {
   tags: string[];
   onboarded: boolean;
   default_radius_mi: number;
+  notifications_enabled: boolean;
   is_admin: boolean;
 };
 
@@ -47,6 +48,16 @@ export type EventItem = {
   tag_overlap?: number;
   relevance?: number;
   invite_reason?: string | null;
+};
+
+export type AppNotification = {
+  id: number;
+  kind: "ai_invite" | "user_invite" | "event_join" | string;
+  title: string;
+  body: string;
+  event_id: number | null;
+  read: boolean;
+  created_at: string | null;
 };
 
 export type Origin = { lat: number; lng: number };

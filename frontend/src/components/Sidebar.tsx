@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { client } from "@/lib/api";
 import { defaultCity, resolveOrigin } from "@/lib/geo";
+import { NotificationBell } from "@/components/Notifications";
 
 const LINKS = [
   { href: "/map", label: "Map" },
@@ -39,6 +40,7 @@ export function Sidebar() {
         <p className="mt-1 text-[11px] uppercase tracking-[0.22em] text-mute">{cityLabel || "Meetups"}</p>
       </Link>
       <nav className="flex flex-1 flex-col gap-1">
+        <NotificationBell />
         {LINKS.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
           return (

@@ -48,6 +48,8 @@ def patch_me(
         user.lng = body.lng
     if body.default_radius_mi is not None:
         user.default_radius_mi = body.default_radius_mi
+    if body.notifications_enabled is not None:
+        user.notifications_enabled = body.notifications_enabled
     db.commit()
     db.refresh(user)
     return user_public(user)
