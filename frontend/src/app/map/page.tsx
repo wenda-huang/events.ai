@@ -165,11 +165,11 @@ function MapView() {
               setRecommendedExpanded(false);
             }
           }}
-          className={`absolute bottom-0 right-0 z-[500] flex w-[600px] max-w-[92vw] flex-col p-4 transition-[height] duration-300 ease-out ${
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col p-4 transition-[height] duration-300 ease-out ${
             recommendedExpanded ? "h-[min(90vh,100%)]" : "h-[22vh]"
           }`}
         >
-          <div className="pointer-events-auto flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
+          <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
             <div className="mb-2 flex shrink-0 items-center justify-between">
               <p className="text-[11px] uppercase tracking-[0.2em] text-gold">
                 Recommended
