@@ -9,6 +9,7 @@ import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "
 
 import { client } from "@/lib/api";
 import { formatWhen } from "@/lib/geo";
+import { coverTag, PALETTES, type CoverTag } from "@/components/EventCover";
 import type { EventItem, Origin } from "@/lib/types";
 
 import "leaflet/dist/leaflet.css";
@@ -16,28 +17,47 @@ import "leaflet/dist/leaflet.css";
 const DEFAULT_TILES = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 const CLUSTER_PIXELS = 28;
 
-const pinIcons = new Map<number, L.DivIcon>();
+function hexToRgb(hex: string) {
+  const clean = hex.replace("#", "");
+  const value = parseInt(clean, 16);
+  return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+}
 
-function pinIcon(count: number) {
-  const key = count <= 1 ? 1 : count;
-  const cached = pinIcons.get(key);
+const singlePinIcons = new Map<CoverTag, L.DivIcon>();
+const clusterPinIcons = new Map<number, L.DivIcon>();
+
+function singlePinIcon(tag: CoverTag) {
+  const cached = singlePinIcons.get(tag);
   if (cached) return cached;
-  const icon =
-    key === 1
-      ? L.divIcon({
-          className: "event-pin",
-          html: '<span class="pin-dot"></span>',
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
-        })
-      : L.divIcon({
-          className: "event-pin",
-          html: `<span class="pin-dot pin-cluster">${key}</span>`,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        });
-  pinIcons.set(key, icon);
+  const p = PALETTES[tag];
+  const { r, g, b } = hexToRgb(p.sky1);
+  const style = `--pin-light:${p.light};--pin-accent:${p.sky1};--pin-shadow:${p.land};--pin-glow:rgba(${r}, ${g}, ${b}, 0.3);`;
+  const icon = L.divIcon({
+    className: "event-pin",
+    html: `<span class="pin-dot" style="${style}"></span>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+  singlePinIcons.set(tag, icon);
   return icon;
+}
+
+function clusterPinIcon(count: number) {
+  const cached = clusterPinIcons.get(count);
+  if (cached) return cached;
+  const icon = L.divIcon({
+    className: "event-pin",
+    html: `<span class="pin-dot pin-cluster">${count}</span>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+  clusterPinIcons.set(count, icon);
+  return icon;
+}
+
+function pinIconFor(events: EventItem[]) {
+  if (events.length === 1) return singlePinIcon(coverTag(events[0].tags));
+  return clusterPinIcon(events.length);
 }
 
 let userDotIcon: L.DivIcon | null = null;
@@ -225,7 +245,7 @@ function ClusteredMarkers({ events }: { events: EventItem[] }) {
         <Marker
           key={cluster.id}
           position={[cluster.lat, cluster.lng]}
-          icon={pinIcon(cluster.events.length)}
+          icon={pinIconFor(cluster.events)}
           eventHandlers={{
             mouseover: () => show(cluster.id),
             mouseout: hideSoon,
@@ -356,7 +376,7 @@ export default function EventMap({
         />
       )}
       {pick && (
-        <Marker position={[pick.lat, pick.lng]} icon={pinIcon(1)}>
+        <Marker position={[pick.lat, pick.lng]} icon={singlePinIcon("community")}>
           <Tooltip permanent className="event-tip">
             New event
           </Tooltip>
