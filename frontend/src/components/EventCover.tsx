@@ -21,11 +21,11 @@ const COVERS = [
   "community",
 ] as const;
 
-type CoverTag = (typeof COVERS)[number];
+export type CoverTag = (typeof COVERS)[number];
 
 const COVER_SET = new Set<string>(COVERS);
 
-type Palette = {
+export type Palette = {
   sky0: string;
   sky1: string;
   land: string;
@@ -33,7 +33,7 @@ type Palette = {
   light: string;
 };
 
-const PALETTES: Record<CoverTag, Palette> = {
+export const PALETTES: Record<CoverTag, Palette> = {
   music: { sky0: "#1b1424", sky1: "#7a3b2e", land: "#241820", accent: "#f0a202", light: "#f6e2b3" },
   food: { sky0: "#f3d5a6", sky1: "#e08a4c", land: "#8a3b1c", accent: "#f2c14e", light: "#fff4dc" },
   sports: { sky0: "#87b7d9", sky1: "#2f6b4f", land: "#1f4a38", accent: "#f0a202", light: "#e8f4ea" },
@@ -53,10 +53,9 @@ const PALETTES: Record<CoverTag, Palette> = {
 };
 
 export function coverTag(tags?: string[] | null): CoverTag {
-  for (const tag of tags || []) {
-    if (COVER_SET.has(tag)) return tag as CoverTag;
-  }
-  return "community";
+  const matches = (tags || []).filter((tag): tag is CoverTag => COVER_SET.has(tag));
+  if (matches.length === 0) return "community";
+  return [...matches].sort()[0];
 }
 
 function Motif({ tag, p }: { tag: CoverTag; p: Palette }) {

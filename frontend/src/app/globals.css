@@ -124,8 +124,8 @@ body {
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: radial-gradient(circle at 35% 30%, #ffe08a, #f0a202 55%, #c44900);
-  box-shadow: 0 0 0 3px rgba(240, 162, 2, 0.25), 0 6px 14px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at 35% 30%, var(--pin-light, #ffe08a), var(--pin-accent, #f0a202) 55%, var(--pin-shadow, #c44900));
+  box-shadow: 0 0 0 3px var(--pin-glow, rgba(240, 162, 2, 0.25)), 0 6px 14px rgba(0, 0, 0, 0.45);
 }
 
 .pin-dot.pin-cluster {
@@ -137,6 +137,8 @@ body {
   font-weight: 650;
   line-height: 1;
   color: #1c1814;
+  background: radial-gradient(circle at 35% 30%, #e4e4e2, #9a958c 55%, #5c5750);
+  box-shadow: 0 0 0 3px rgba(120, 116, 108, 0.28), 0 6px 14px rgba(0, 0, 0, 0.45);
 }
 
 .user-location-pin {
