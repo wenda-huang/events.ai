@@ -88,6 +88,17 @@ def lookup_place(
 ) -> GeoHit | None:
     if is_city_level_address(address, city_label=city):
         return None
+    return geocode_event_address(address, city, proximity=proximity, allow_nominatim=allow_nominatim)
+
+
+def geocode_event_address(
+    address: str,
+    city: str = "",
+    *,
+    proximity: tuple[float, float] | None = None,
+    allow_nominatim: bool = False,
+) -> GeoHit | None:
+    """Resolve a user-entered venue through Mapbox (Photon fallback). City-only queries are allowed."""
     for query in _queries(address, city):
         key = query.casefold()
         with _cache_lock:

@@ -39,9 +39,9 @@ class ProfilePatch(BaseModel):
 class EventCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = ""
-    lat: float
-    lng: float
-    address: str = ""
+    lat: float | None = None
+    lng: float | None = None
+    address: str = Field(min_length=1, max_length=300)
     city: str = ""
     city_id: int | None = None
     starts_at: datetime

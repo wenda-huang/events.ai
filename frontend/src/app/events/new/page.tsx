@@ -27,6 +27,10 @@ function CreateEvent() {
   const [peopleMax, setPeopleMax] = useState(12);
   const [cost, setCost] = useState("Free");
   const [pick, setPick] = useState<Origin>(DEFAULT_ORIGIN);
+  const [located, setLocated] = useState(false);
+  const [geoHint, setGeoHint] = useState("");
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [focusNonce, setFocusNonce] = useState(0);
   const [cities, setCities] = useState<City[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,25 +38,67 @@ function CreateEvent() {
   useEffect(() => {
     client.tags().then((res) => setTags(res.tags));
     client.cities().then((res) => setCities(res.cities));
-    client.me().then((me) => {
-      if (me.lat != null && me.lng != null) setPick({ lat: me.lat, lng: me.lng });
-    });
   }, []);
+
+  useEffect(() => {
+    const query = address.trim();
+    if (query.length < 3) {
+      setLocated(false);
+      setGeoBusy(false);
+      setGeoHint(query ? "Keep typing an address" : "");
+      return;
+    }
+    let cancelled = false;
+    setGeoBusy(true);
+    setGeoHint("Looking up that address…");
+    const timer = window.setTimeout(async () => {
+      try {
+        const hit = await client.geocode(query);
+        if (cancelled) return;
+        setPick({ lat: hit.lat, lng: hit.lng });
+        setLocated(true);
+        setFocusNonce((n) => n + 1);
+        setGeoHint(hit.address && hit.address !== query ? hit.address : "Pinned from this address");
+      } catch {
+        if (cancelled) return;
+        setLocated(false);
+        setGeoHint("Could not find that address");
+      } finally {
+        if (!cancelled) setGeoBusy(false);
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [address]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    const query = address.trim();
+    if (!query) {
+      setError("Add an address so we can place the event on the map");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const city = nearestCity(pick, cities);
+      let coords = located ? pick : null;
+      if (!coords) {
+        const hit = await client.geocode(query);
+        coords = { lat: hit.lat, lng: hit.lng };
+        setPick(coords);
+        setLocated(true);
+      }
+      const city = nearestCity(coords, cities);
       const created = await client.createEvent({
         title,
         description,
-        address,
+        address: query,
         city: city?.name ?? "",
         city_id: city?.id,
-        lat: pick.lat,
-        lng: pick.lng,
+        lat: coords.lat,
+        lng: coords.lng,
         starts_at: new Date(starts).toISOString(),
         ends_at: new Date(ends).toISOString(),
         people_min: peopleMin,
@@ -72,13 +118,22 @@ function CreateEvent() {
     <div className="grid min-h-0 flex-1 grid-cols-[1.1fr_0.9fr]">
       <form onSubmit={onSubmit} className="overflow-auto px-8 py-8">
         <h1 className="font-display text-4xl text-cream">Post an event</h1>
-        <p className="mt-2 text-sm text-mute">Click the map to drop a pin. You are automatically signed up as host.</p>
+        <p className="mt-2 text-sm text-mute">
+          Enter a street or venue. Mapbox places the pin there — not at your current location.
+        </p>
         <label className="mt-6 block text-xs uppercase tracking-wide text-mute">Title</label>
         <input className="field mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required />
         <label className="mt-4 block text-xs uppercase tracking-wide text-mute">Description</label>
         <textarea className="field mt-2 min-h-28" value={description} onChange={(e) => setDescription(e.target.value)} />
         <label className="mt-4 block text-xs uppercase tracking-wide text-mute">Address</label>
-        <input className="field mt-2" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Neighborhood or street" />
+        <input
+          className="field mt-2"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Street, venue, or neighborhood"
+          required
+        />
+        {geoHint && <p className={`mt-2 text-xs ${located ? "text-gold" : "text-mute"}`}>{geoHint}</p>}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs uppercase tracking-wide text-mute">Starts</label>
@@ -107,12 +162,18 @@ function CreateEvent() {
           <TagPicker tags={tags} selected={selected} onChange={setSelected} />
         </div>
         {error && <p className="mt-4 text-sm text-rust">{error}</p>}
-        <button className="btn-gold mt-6" disabled={busy}>
+        <button className="btn-gold mt-6" disabled={busy || geoBusy}>
           {busy ? "Publishing…" : "Publish event"}
         </button>
       </form>
       <div className="h-full border-l border-line">
-        <EventMap origin={pick} pick={pick} onPick={setPick} zoom={13} />
+        <EventMap
+          origin={pick}
+          pick={located ? pick : null}
+          focusNonce={focusNonce}
+          zoom={located ? 15 : 12}
+          recenterZoom={located ? 15 : 12}
+        />
       </div>
     </div>
   );

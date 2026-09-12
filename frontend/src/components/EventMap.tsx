@@ -261,11 +261,11 @@ function ClusteredMarkers({ events }: { events: EventItem[] }) {
   );
 }
 
-function Recenter({ origin, nonce = 0 }: { origin: Origin; nonce?: number }) {
+function Recenter({ origin, nonce = 0, zoom }: { origin: Origin; nonce?: number; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView([origin.lat, origin.lng], map.getZoom());
-  }, [map, origin.lat, origin.lng, nonce]);
+    map.setView([origin.lat, origin.lng], zoom ?? map.getZoom());
+  }, [map, origin.lat, origin.lng, nonce, zoom]);
   return null;
 }
 
@@ -321,6 +321,7 @@ type Props = {
   onUserLocationClick?: () => void;
   focusNonce?: number;
   zoom?: number;
+  recenterZoom?: number;
   userLocation?: Origin | null;
 };
 
@@ -334,6 +335,7 @@ export default function EventMap({
   onUserLocationClick,
   focusNonce = 0,
   zoom = 13,
+  recenterZoom,
   userLocation,
 }: Props) {
   const center = pick ?? origin;
@@ -359,7 +361,7 @@ export default function EventMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
         url={tileUrl}
       />
-      <Recenter origin={center} nonce={focusNonce} />
+      <Recenter origin={center} nonce={focusNonce} zoom={recenterZoom} />
       <MapGestures onPick={onPick} onMapInteract={onMapInteract} onViewIdle={onViewIdle} />
       <ClusteredMarkers events={events} />
       {userLocation && (

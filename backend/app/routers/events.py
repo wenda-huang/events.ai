@@ -10,6 +10,7 @@ from app.geo import MAX_RADIUS_MI, within_radius
 from app.models import City, Event, EventMembership, User
 from app.schemas import EventCreate
 from app.serialize import dump_tags, event_public, parse_tags
+from app.services import geocode
 from app.services.search import MIN_SCORE, expand_query, score_event
 from app.tags import normalize_tags
 
@@ -164,6 +165,20 @@ def my_events(user: User = Depends(get_current_user), db: Session = Depends(get_
     return {"joined": joined, "invited": invited}
 
 
+@router.get("/geocode")
+def geocode_lookup(
+    q: str = Query(..., min_length=2, max_length=300),
+    lat: float | None = None,
+    lng: float | None = None,
+    user: User = Depends(get_current_user),
+):
+    proximity = (lat, lng) if lat is not None and lng is not None else None
+    hit = geocode.geocode_event_address(q, proximity=proximity)
+    if hit is None:
+        raise HTTPException(status_code=404, detail="Could not find that address")
+    return {"lat": hit.lat, "lng": hit.lng, "address": hit.address or q.strip()}
+
+
 @router.get("/events/{event_id}")
 def get_event(
     event_id: int,
@@ -194,13 +209,19 @@ def create_event(
         raise HTTPException(status_code=400, detail="Event end must be after start")
     if body.people_max < body.people_min:
         raise HTTPException(status_code=400, detail="people_max must be >= people_min")
-    city_row = _resolve_city(db, city_id=body.city_id, city_name=body.city, lat=body.lat, lng=body.lng)
+    proximity = (body.lat, body.lng) if body.lat is not None and body.lng is not None else None
+    hit = geocode.geocode_event_address(body.address, body.city, proximity=proximity)
+    if hit is None:
+        raise HTTPException(status_code=400, detail="Could not find that address on the map")
+    lat, lng = hit.lat, hit.lng
+    address = geocode.prefer_address(body.address, hit.address)
+    city_row = _resolve_city(db, city_id=body.city_id, city_name=body.city, lat=lat, lng=lng)
     event = Event(
         title=body.title.strip(),
         description=body.description.strip(),
-        lat=body.lat,
-        lng=body.lng,
-        address=body.address.strip(),
+        lat=lat,
+        lng=lng,
+        address=address.strip(),
         city=city_row.name if city_row else body.city.strip(),
         city_id=city_row.id if city_row else None,
         starts_at=starts,

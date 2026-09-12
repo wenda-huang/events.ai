@@ -192,6 +192,14 @@ export const client = {
   events: (params: URLSearchParams) => api<{ events: EventItem[] }>(`/events?${params}`),
   recommended: (params: URLSearchParams) => api<{ events: EventItem[] }>(`/events/recommended?${params}`),
   event: (id: number) => api<EventItem>(`/events/${id}`),
+  geocode: (q: string, proximity?: { lat: number; lng: number }) => {
+    const params = new URLSearchParams({ q });
+    if (proximity) {
+      params.set("lat", String(proximity.lat));
+      params.set("lng", String(proximity.lng));
+    }
+    return api<{ lat: number; lng: number; address: string }>(`/geocode?${params}`);
+  },
   createEvent: (body: Record<string, unknown>) =>
     api<EventItem>("/events", { method: "POST", body: JSON.stringify(body) }),
   signup: (id: number) => api<EventItem>(`/events/${id}/signup`, { method: "POST" }),

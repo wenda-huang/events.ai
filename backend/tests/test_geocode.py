@@ -1,6 +1,8 @@
 import unittest
 
-from app.services.geocode import is_city_level_address, looks_specific_address, lookup_place, prefer_address
+from unittest.mock import patch
+
+from app.services.geocode import GeoHit, geocode_event_address, is_city_level_address, looks_specific_address, lookup_place, prefer_address
 from app.services.mapbox import _hit_from_payload
 
 
@@ -27,6 +29,14 @@ class GeocodeHelperTests(unittest.TestCase):
     def test_city_level_skips_geocode(self):
         self.assertIsNone(lookup_place("Pittsburgh, PA", "Pittsburgh, PA"))
 
+    def test_user_event_geocodes_address_not_user_coords(self):
+        hit = GeoHit(lat=40.44611, lng=-80.01229, address="Stage AE, Pittsburgh")
+        with patch("app.services.geocode._hit_from_mapbox", return_value=hit) as mocked:
+            found = geocode_event_address("Stage AE", "Pittsburgh")
+        mocked.assert_called()
+        self.assertEqual(found.lat, 40.44611)
+        self.assertEqual(found.lng, -80.01229)
+
     def test_mapbox_payload_reads_coords_and_address(self):
         hit = _hit_from_payload(
             {
@@ -42,6 +52,38 @@ class GeocodeHelperTests(unittest.TestCase):
         lat, lng, address = hit
         self.assertAlmostEqual(lat, 40.44611)
         self.assertAlmostEqual(lng, -80.01229)
+        self.assertIn("Stage AE", address)
+
+    def test_mapbox_prefers_named_poi_over_city(self):
+        from app.services.mapbox import _best_hit_from_payload
+
+        hit = _best_hit_from_payload(
+            "Stage AE, Pittsburgh, PA",
+            {
+                "features": [
+                    {
+                        "geometry": {"coordinates": [-79.996754, 40.439375]},
+                        "properties": {
+                            "name": "Pittsburgh",
+                            "feature_type": "place",
+                            "full_address": "Pittsburgh, Pennsylvania, United States",
+                        },
+                    },
+                    {
+                        "geometry": {"coordinates": [-80.012283, 40.446148]},
+                        "properties": {
+                            "name": "Stage AE",
+                            "feature_type": "poi",
+                            "full_address": "400 North Shore Drive, Pittsburgh, Pennsylvania 15212, United States",
+                        },
+                    },
+                ]
+            },
+        )
+        self.assertIsNotNone(hit)
+        lat, lng, address = hit
+        self.assertAlmostEqual(lat, 40.446148)
+        self.assertAlmostEqual(lng, -80.012283)
         self.assertIn("Stage AE", address)
 
 
