@@ -16,6 +16,7 @@ function MapView() {
   const windowDefaults = useMemo(() => defaultWindow(), []);
   const [origin, setOrigin] = useState<Origin>(PITTSBURGH);
   const [outsideCity, setOutsideCity] = useState(false);
+  const [userLocation, setUserLocation] = useState<Origin | null>(null);
   const [radius, setRadius] = useState(3);
   const [start, setStart] = useState(windowDefaults.start);
   const [end, setEnd] = useState(windowDefaults.end);
@@ -34,9 +35,11 @@ function MapView() {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const resolved = resolveOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const resolved = resolveOrigin(coords);
         setOrigin(resolved.origin);
         setOutsideCity(resolved.outsideCity);
+        setUserLocation(coords);
       },
       () => {
         setOrigin(PITTSBURGH);
@@ -66,7 +69,7 @@ function MapView() {
 
   return (
     <div className="relative min-h-0 flex-1">
-      <EventMap origin={origin} events={events} />
+      <EventMap origin={origin} events={events} userLocation={userLocation} />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">

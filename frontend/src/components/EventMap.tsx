@@ -40,6 +40,20 @@ function pinIcon(count: number) {
   return icon;
 }
 
+let userDotIcon: L.DivIcon | null = null;
+
+function getUserDotIcon() {
+  if (!userDotIcon) {
+    userDotIcon = L.divIcon({
+      className: "user-location-pin",
+      html: '<span class="user-dot"></span>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+  }
+  return userDotIcon;
+}
+
 type EventCluster = {
   id: string;
   lat: number;
@@ -237,9 +251,10 @@ type Props = {
   pick?: Origin | null;
   onPick?: (origin: Origin) => void;
   zoom?: number;
+  userLocation?: Origin | null;
 };
 
-export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 }: Props) {
+export default function EventMap({ origin, events = [], pick, onPick, zoom = 13, userLocation }: Props) {
   const center = pick ?? origin;
   const [tileUrl, setTileUrl] = useState(DEFAULT_TILES);
 
@@ -266,6 +281,14 @@ export default function EventMap({ origin, events = [], pick, onPick, zoom = 13 
       <Recenter origin={center} />
       <ClickCapture onPick={onPick} />
       <ClusteredMarkers events={events} />
+      {userLocation && (
+        <Marker
+          position={[userLocation.lat, userLocation.lng]}
+          icon={getUserDotIcon()}
+          interactive={false}
+          zIndexOffset={-100}
+        />
+      )}
       {pick && (
         <Marker position={[pick.lat, pick.lng]} icon={pinIcon(1)}>
           <Tooltip permanent className="event-tip">
