@@ -5,15 +5,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#14110e",
-        panel: "#1c1814",
-        card: "#241f1a",
-        line: "#3a3229",
-        cream: "#f3ebe0",
-        mute: "#9a8f82",
-        gold: "#f0a202",
-        rust: "#c44900",
-        river: "#3d8b8b",
+        ink: "#f6f1e6",
+        panel: "#efe4d2",
+        card: "#fffdf8",
+        line: "#e2d5bf",
+        cream: "#241f1a",
+        mute: "#8a7d6c",
+        gold: "#b9790a",
+        rust: "#b23c00",
+        river: "#2f6b6b",
+        night: "#1c1814",
       },
       fontFamily: {
         display: ["var(--font-display)", "serif"],

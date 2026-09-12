@@ -3,14 +3,14 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
 body {
   height: 100%;
-  background: #14110e;
-  color: #f3ebe0;
+  background: #f6f1e6;
+  color: #241f1a;
 }
 
 body {
@@ -18,21 +18,21 @@ body {
 }
 
 .leaflet-container {
-  background: #1a1713;
+  background: #efe4d2;
   font-family: inherit;
 }
 
 .leaflet-tooltip.event-tip {
-  background: #241f1a;
-  color: #f3ebe0;
-  border: 1px solid #3a3229;
+  background: #fffdf8;
+  color: #241f1a;
+  border: 1px solid #e2d5bf;
   border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 30px rgba(20, 17, 14, 0.15);
   padding: 10px 12px;
 }
 
 .leaflet-tooltip.event-tip::before {
-  border-top-color: #3a3229;
+  border-top-color: #e2d5bf;
 }
 
 .event-pin {
@@ -64,7 +64,7 @@ select {
 }
 
 .btn-gold {
-  @apply btn bg-gold text-ink hover:bg-[#ffb703];
+  @apply btn bg-gold text-night hover:bg-[#a66a08];
 }
 
 .btn-ghost {

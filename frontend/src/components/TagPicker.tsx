@@ -20,7 +20,7 @@ export function TagPicker({ tags, selected, onChange }: Props) {
             type="button"
             onClick={() => toggle(tag)}
             className={`rounded-full border px-3 py-1 text-xs capitalize tracking-wide ${
-              on ? "border-gold bg-gold text-ink" : "border-line bg-ink text-mute hover:text-cream"
+              on ? "border-gold bg-gold text-night" : "border-line bg-ink text-mute hover:text-cream"
             }`}
           >
             {tag}
