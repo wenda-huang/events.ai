@@ -340,11 +340,7 @@ export default function EventMap({
               onUserLocationClick?.();
             },
           }}
-        >
-          <Tooltip className="event-tip" direction="top" offset={[0, -8]}>
-            Recenter on your location
-          </Tooltip>
-        </Marker>
+        />
       )}
       {pick && (
         <Marker position={[pick.lat, pick.lng]} icon={pinIcon(1)}>
