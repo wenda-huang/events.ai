@@ -1,4 +1,8 @@
+import dns from "node:dns";
+
 import { NextRequest, NextResponse } from "next/server";
+
+dns.setDefaultResultOrder("ipv4first");
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,27 +38,30 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     method === "GET" || method === "HEAD" ? undefined : Buffer.from(await req.arrayBuffer());
 
   let lastError = "Connection refused";
-  for (const base of backendBases()) {
-    try {
-      const res = await fetch(`${base}/${targetPath}`, {
-        method,
-        headers,
-        body,
-        cache: "no-store",
-        redirect: "manual",
-      });
-      const out = new Headers();
-      res.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP.has(key.toLowerCase())) out.set(key, value);
-      });
-      return new NextResponse(res.body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: out,
-      });
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    for (const base of backendBases()) {
+      try {
+        const res = await fetch(`${base}/${targetPath}`, {
+          method,
+          headers,
+          body,
+          cache: "no-store",
+          redirect: "manual",
+        });
+        const out = new Headers();
+        res.headers.forEach((value, key) => {
+          if (!HOP_BY_HOP.has(key.toLowerCase())) out.set(key, value);
+        });
+        return new NextResponse(res.body, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: out,
+        });
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
     }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
   return NextResponse.json(

@@ -15,7 +15,7 @@ copy .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Frontend:
+Frontend (also starts the FastAPI backend on port 8000 if it is not already running):
 
 ```
 cd frontend
