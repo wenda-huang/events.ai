@@ -48,9 +48,13 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="events.ai", lifespan=lifespan)
 origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+for origin in ("http://localhost:3000", "http://127.0.0.1:3000"):
+    if origin not in origins:
+        origins.append(origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or ["http://localhost:3000"],
+    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,9 +72,14 @@ def health():
 
 @app.get("/config/public")
 def public_config():
+    tile_url = settings.secret("carto_tile_url") or settings.carto_tile_url
+    carto_key = settings.secret("carto_api_key")
+    if carto_key:
+        separator = "&" if "?" in tile_url else "?"
+        tile_url = f"{tile_url}{separator}key={carto_key}"
     return {
         "carto_api_base_url": settings.secret("carto_api_base_url") or settings.carto_api_base_url,
-        "tile_url": settings.secret("carto_tile_url") or settings.carto_tile_url,
-        "has_carto_key": bool(settings.secret("carto_api_key")),
+        "tile_url": tile_url,
+        "has_carto_key": bool(carto_key),
         "has_querit_key": bool(settings.secret("querit_api_key")),
     }

@@ -31,7 +31,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_top,_#3a2a12,_#14110e_55%)] px-4">
+    <div className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_top,_#f2ddac,_#f6f1e6_55%)] px-4">
       <form onSubmit={onSubmit} className="w-full max-w-md rounded-3xl border border-line bg-panel p-8 shadow-lift">
         <p className="text-[11px] uppercase tracking-[0.24em] text-gold">Join events.ai</p>
         <h1 className="mt-2 font-display text-4xl text-cream">Create your spot.</h1>
