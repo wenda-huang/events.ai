@@ -87,10 +87,12 @@ function MapView() {
   const [recommendedExpanded, setRecommendedExpanded] = useState(false);
   const mapAreaRef = useRef<HTMLDivElement>(null);
   const recommendedListRef = useRef<HTMLDivElement>(null);
-  const recHeaderRef = useRef<HTMLDivElement>(null);
+  const [recHeaderEl, setRecHeaderEl] = useState<HTMLDivElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const searchOverlayRef = useRef<HTMLDivElement>(null);
   const [searchOverlayHeight, setSearchOverlayHeight] = useState(128);
   const [panelHeight, setPanelHeight] = useState<number>();
+  const [collapsedPanelHeight, setCollapsedPanelHeight] = useState<number>();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [recommended, setRecommended] = useState<EventItem[]>([]);
   const [error, setError] = useState("");
@@ -229,14 +231,23 @@ function MapView() {
   }, []);
 
   useLayoutEffect(() => {
+    if (!recHeaderEl) return;
+    const update = () => setHeaderHeight(recHeaderEl.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(recHeaderEl);
+    return () => observer.disconnect();
+  }, [recHeaderEl]);
+
+  useLayoutEffect(() => {
     const mapHeight = mapAreaRef.current?.clientHeight ?? 0;
-    const headerHeight = recHeaderRef.current?.getBoundingClientRect().height ?? 0;
     const outerPad = 32;
     const innerPad = 24;
     const collapsedHeight = Math.ceil(outerPad + innerPad + headerHeight);
     const expandedHeight = Math.max(collapsedHeight, mapHeight - searchOverlayHeight);
+    setCollapsedPanelHeight(collapsedHeight);
     setPanelHeight(recommendedExpanded ? expandedHeight : collapsedHeight);
-  }, [recommendedExpanded, searchOverlayHeight]);
+  }, [recommendedExpanded, searchOverlayHeight, headerHeight]);
 
   return (
     <div ref={mapAreaRef} className="relative min-h-0 flex-1">
@@ -368,10 +379,10 @@ function MapView() {
             }
           }}
           className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col overflow-hidden p-4 transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-          style={panelHeight ? { height: panelHeight } : undefined}
+          style={{ height: panelHeight, minHeight: collapsedPanelHeight }}
         >
           <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel/94 p-3 shadow-lift backdrop-blur">
-            <div ref={recHeaderRef} className="mb-2 flex shrink-0 items-center justify-between">
+            <div ref={setRecHeaderEl} className="mb-2 flex shrink-0 items-center justify-between">
               <p className="text-[11px] uppercase tracking-[0.2em] text-gold">
                 Recommended
                 <span className="ml-2 tracking-normal text-mute">
