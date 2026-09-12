@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from app.config import Settings
 from app.main import public_config
 from app.services.carto import append_basemap_key, public_tile_url
 
@@ -49,28 +50,25 @@ class AppendBasemapKeyTests(unittest.TestCase):
 
 class PublicTileUrlTests(unittest.TestCase):
     def test_uses_configured_key(self):
-        secrets = {
-            "carto_tile_url": TILE,
-            "carto_api_key": "from-ini",
-        }
-        with patch("app.services.carto.settings.secret", side_effect=lambda name: secrets.get(name, "")):
+        def secret(_self, name: str) -> str:
+            return {
+                "carto_tile_url": TILE,
+                "carto_api_key": "from-ini",
+            }.get(name, "")
+
+        with patch.object(Settings, "secret", secret):
             self.assertEqual(public_tile_url(), f"{TILE}?key=from-ini")
 
     def test_public_config_includes_key_on_tile_url(self):
-        secrets = {
-            "carto_api_base_url": "https://gcp-us-east1.api.carto.com",
-            "carto_tile_url": TILE,
-            "carto_api_key": "map-key",
-            "querit_api_key": "",
-        }
+        def secret(_self, name: str) -> str:
+            return {
+                "carto_api_base_url": "https://gcp-us-east1.api.carto.com",
+                "carto_tile_url": TILE,
+                "carto_api_key": "map-key",
+                "querit_api_key": "",
+            }.get(name, "")
 
-        def secret(name: str) -> str:
-            return secrets.get(name, "")
-
-        with (
-            patch("app.main.settings.secret", side_effect=secret),
-            patch("app.services.carto.settings.secret", side_effect=secret),
-        ):
+        with patch.object(Settings, "secret", secret):
             cfg = public_config()
         self.assertTrue(cfg["has_carto_key"])
         self.assertEqual(cfg["tile_url"], f"{TILE}?key=map-key")
