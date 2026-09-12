@@ -25,6 +25,14 @@ def _default_window() -> tuple[datetime, datetime]:
     return start, start + timedelta(days=14)
 
 
+def interest_overlap(user_tags: set[str], event_tags: set[str]) -> int:
+    return len(user_tags & event_tags)
+
+
+def recommend_sort_key(event: dict) -> tuple:
+    return (-int(event.get("tag_overlap") or 0), event.get("distance_mi") or 99, event.get("starts_at") or "")
+
+
 def _matches_query(event: Event, q: str) -> bool:
     needle = q.strip().lower()
     if not needle:
@@ -97,14 +105,11 @@ def recommended_events(
         if not within_radius(lat, lng, event.lat, event.lng, radius_mi):
             continue
         event_tags = set(parse_tags(event.tags))
-        overlap = len(user_tags & event_tags)
-        if user_tags and overlap == 0:
-            continue
         payload = event_public(event, origin=(lat, lng), current_user_id=user.id)
-        payload["tag_overlap"] = overlap
+        payload["tag_overlap"] = interest_overlap(user_tags, event_tags)
         scored.append(payload)
-    scored.sort(key=lambda e: (-e["tag_overlap"], e["distance_mi"] or 99, e["starts_at"]))
-    return {"events": scored[:12]}
+    scored.sort(key=recommend_sort_key)
+    return {"events": scored}
 
 
 @router.get("/me/events")
