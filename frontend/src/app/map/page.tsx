@@ -99,7 +99,7 @@ function MapView() {
 
   return (
     <div className="relative min-h-0 flex-1">
-      <EventMap origin={origin} events={events} onMapClick={() => setRecommendedExpanded(false)} />
+      <EventMap origin={origin} events={events} onMapInteract={() => setRecommendedExpanded(false)} />
       <div ref={searchOverlayRef} className="pointer-events-none absolute inset-x-0 top-0 z-[510] p-4">
         <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-line bg-panel/92 p-3 shadow-lift backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
