@@ -7,10 +7,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EventCard } from "@/components/EventCard";
 import { EventCover } from "@/components/EventCover";
+import { RadiusSlider } from "@/components/RadiusSlider";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TagPicker } from "@/components/TagPicker";
 import { client } from "@/lib/api";
 import { DEFAULT_ORIGIN, defaultCity, defaultWindow, formatWhen, queryParams, resolveOrigin, roundCoord, sameOrigin } from "@/lib/geo";
+import { radiusMiToSlider, sliderToRadiusMi } from "@/lib/radius";
 import type { City, EventItem, Origin } from "@/lib/types";
 
 const SEARCH_DEBOUNCE_MS = 2000;
@@ -71,7 +73,8 @@ function MapView() {
   const [searchCenter, setSearchCenter] = useState<Origin>(DEFAULT_ORIGIN);
   const [outsideCity, setOutsideCity] = useState(false);
   const [userLocation, setUserLocation] = useState<Origin | null>(null);
-  const [radius, setRadius] = useState(3);
+  const [radiusSlider, setRadiusSlider] = useState(radiusMiToSlider(3));
+  const radius = sliderToRadiusMi(radiusSlider);
   const [start, setStart] = useState(windowDefaults.start);
   const [end, setEnd] = useState(windowDefaults.end);
   const [q, setQ] = useState("");
@@ -108,7 +111,7 @@ function MapView() {
       if (!cancelled) setAllTags(res.tags);
     });
     client.me().then((me) => {
-      if (!cancelled && me.default_radius_mi) setRadius(me.default_radius_mi);
+      if (!cancelled && me.default_radius_mi) setRadiusSlider(radiusMiToSlider(me.default_radius_mi));
     });
     client.cities().then((res) => {
       if (cancelled) return;
@@ -275,16 +278,11 @@ function MapView() {
             </div>
             <label className="flex items-center gap-2 text-xs text-mute">
               Radius
-              <input
-                type="range"
-                min={1}
-                max={15}
-                step={0.5}
-                value={radius}
-                onChange={(e) => setRadius(Number(e.target.value))}
-                style={{ ["--range-progress" as string]: `${((radius - 1) / 14) * 100}%` }}
+              <RadiusSlider
+                slider={radiusSlider}
+                onSliderChange={setRadiusSlider}
+                valueClassName="min-w-[3.75rem] text-right text-cream"
               />
-              <span className="w-10 text-cream">{radius} mi</span>
             </label>
             <button
               type="button"

@@ -4,21 +4,24 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
+import { RadiusSlider } from "@/components/RadiusSlider";
 import { RequireAuth } from "@/components/RequireAuth";
 import { client } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import { logApp, logScanEnd, logScanEvent, logScanStart } from "@/lib/devlog";
+import { radiusMiToSlider, sliderToRadiusMi } from "@/lib/radius";
 
 function Settings() {
   const router = useRouter();
-  const [radius, setRadius] = useState(3);
+  const [radiusSlider, setRadiusSlider] = useState(radiusMiToSlider(3));
   const [isAdmin, setIsAdmin] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const radius = sliderToRadiusMi(radiusSlider);
 
   useEffect(() => {
     client.me().then((me) => {
-      setRadius(me.default_radius_mi);
+      setRadiusSlider(radiusMiToSlider(me.default_radius_mi));
       setIsAdmin(Boolean(me.is_admin) || me.email.toLowerCase() === "admin@admin.com");
     });
   }, []);
@@ -66,16 +69,11 @@ function Settings() {
       <section className="mt-8 rounded-2xl border border-line bg-card p-5">
         <h2 className="text-sm text-cream">Default search radius</h2>
         <div className="mt-4 flex items-center gap-3">
-          <input
-            type="range"
-            min={1}
-            max={15}
-            step={0.5}
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            style={{ ["--range-progress" as string]: `${((radius - 1) / 14) * 100}%` }}
+          <RadiusSlider
+            slider={radiusSlider}
+            onSliderChange={setRadiusSlider}
+            valueClassName="min-w-[3.75rem] text-sm text-gold"
           />
-          <span className="text-sm text-gold">{radius} mi</span>
           <button className="btn-ghost" onClick={saveRadius}>
             Save
           </button>

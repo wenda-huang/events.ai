@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import get_current_user
 from app.cities import default_city, implemented_cities, match_city, nearest_city
 from app.database import get_db
-from app.geo import within_radius
+from app.geo import MAX_RADIUS_MI, within_radius
 from app.models import City, Event, EventMembership, User
 from app.schemas import EventCreate
 from app.serialize import dump_tags, event_public, parse_tags
@@ -68,7 +68,7 @@ def search_and_distance_origins(
 def list_events(
     lat: float = Query(...),
     lng: float = Query(...),
-    radius_mi: float = Query(3, ge=0.25, le=50),
+    radius_mi: float = Query(3, ge=0.25, le=MAX_RADIUS_MI),
     start: datetime | None = None,
     end: datetime | None = None,
     q: str | None = None,
@@ -110,7 +110,7 @@ def list_events(
 def recommended_events(
     lat: float = Query(...),
     lng: float = Query(...),
-    radius_mi: float = Query(3, ge=0.25, le=50),
+    radius_mi: float = Query(3, ge=0.25, le=MAX_RADIUS_MI),
     start: datetime | None = None,
     end: datetime | None = None,
     origin_lat: float | None = None,
